@@ -15,8 +15,8 @@ from crittercam.pipeline.db import (
 
 
 @pytest.fixture
-def db(tmp_path):
-    """Open an in-memory-style connection to a temp database."""
+def raw_db(tmp_path):
+    """Open a bare database connection with no migrations applied."""
     conn = connect(tmp_path / 'test.db')
     yield conn
     conn.close()
@@ -68,45 +68,45 @@ class TestConnect:
 class TestEnsureMigrationsTable:
     """Test the _ensure_migrations_table function."""
 
-    def test_creates_table_when_absent(self, db):
+    def test_creates_table_when_absent(self, raw_db):
         # Act
-        _ensure_migrations_table(db)
+        _ensure_migrations_table(raw_db)
 
         # Assert
-        row = db.execute(
+        row = raw_db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
         ).fetchone()
         assert row is not None
 
-    def test_idempotent(self, db):
+    def test_idempotent(self, raw_db):
         # Act — calling twice must not raise
-        _ensure_migrations_table(db)
-        _ensure_migrations_table(db)
+        _ensure_migrations_table(raw_db)
+        _ensure_migrations_table(raw_db)
 
 
 class TestAppliedVersions:
     """Test the _applied_versions function."""
 
-    def test_empty_when_no_migrations(self, db):
+    def test_empty_when_no_migrations(self, raw_db):
         # Arrange
-        _ensure_migrations_table(db)
+        _ensure_migrations_table(raw_db)
 
         # Act / Assert
-        assert _applied_versions(db) == set()
+        assert _applied_versions(raw_db) == set()
 
-    def test_returns_applied_versions(self, db):
+    def test_returns_applied_versions(self, raw_db):
         # Arrange
-        _ensure_migrations_table(db)
-        db.execute(
+        _ensure_migrations_table(raw_db)
+        raw_db.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (1, '2026-01-01')"
         )
-        db.execute(
+        raw_db.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (3, '2026-01-02')"
         )
-        db.commit()
+        raw_db.commit()
 
         # Act / Assert
-        assert _applied_versions(db) == {1, 3}
+        assert _applied_versions(raw_db) == {1, 3}
 
 
 class TestVersion:
@@ -130,37 +130,37 @@ class TestVersion:
 class TestMigrate:
     """Test the migrate function."""
 
-    def test_applies_migrations_to_fresh_database(self, db):
+    def test_applies_migrations_to_fresh_database(self, raw_db):
         # Act
-        migrate(db)
+        migrate(raw_db)
 
         # Assert — all three tables from 0001 exist
         tables = {
             row['name']
-            for row in db.execute(
+            for row in raw_db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
         assert {'images', 'detections', 'processing_jobs'}.issubset(tables)
 
-    def test_records_applied_version(self, db):
+    def test_records_applied_version(self, raw_db):
         # Act
-        migrate(db)
+        migrate(raw_db)
 
         # Assert
-        assert 1 in _applied_versions(db)
+        assert 1 in _applied_versions(raw_db)
 
-    def test_idempotent_on_already_migrated_database(self, db):
+    def test_idempotent_on_already_migrated_database(self, raw_db):
         # Act — run twice
-        migrate(db)
-        migrate(db)
+        migrate(raw_db)
+        migrate(raw_db)
 
         # Assert — version recorded exactly once
-        rows = db.execute('SELECT version FROM schema_migrations').fetchall()
+        rows = raw_db.execute('SELECT version FROM schema_migrations').fetchall()
         versions = [row['version'] for row in rows]
         assert versions.count(1) == 1
 
-    def test_applies_migrations_in_order(self, db, tmp_path, monkeypatch):
+    def test_applies_migrations_in_order(self, raw_db, tmp_path, monkeypatch):
         # Arrange — two migrations; second depends on first
         mig_dir = tmp_path / 'migrations'
         mig_dir.mkdir()
@@ -173,14 +173,14 @@ class TestMigrate:
         monkeypatch.setattr('crittercam.pipeline.db.MIGRATIONS_DIR', mig_dir)
 
         # Act
-        migrate(db)
+        migrate(raw_db)
 
         # Assert — both applied
-        assert _applied_versions(db) == {1, 2}
-        cols = {row['name'] for row in db.execute('PRAGMA table_info(foo)')}
+        assert _applied_versions(raw_db) == {1, 2}
+        cols = {row['name'] for row in raw_db.execute('PRAGMA table_info(foo)')}
         assert 'bar' in cols
 
-    def test_skips_already_applied_migrations(self, db, tmp_path, monkeypatch):
+    def test_skips_already_applied_migrations(self, raw_db, tmp_path, monkeypatch):
         # Arrange — pre-seed version 1 as applied
         mig_dir = tmp_path / 'migrations'
         mig_dir.mkdir()
@@ -188,17 +188,17 @@ class TestMigrate:
             'CREATE TABLE should_not_exist (id INTEGER PRIMARY KEY);'
         )
         monkeypatch.setattr('crittercam.pipeline.db.MIGRATIONS_DIR', mig_dir)
-        _ensure_migrations_table(db)
-        db.execute(
+        _ensure_migrations_table(raw_db)
+        raw_db.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (1, '2026-01-01')"
         )
-        db.commit()
+        raw_db.commit()
 
         # Act
-        migrate(db)
+        migrate(raw_db)
 
         # Assert — table was not created (migration was skipped)
-        row = db.execute(
+        row = raw_db.execute(
             "SELECT name FROM sqlite_master WHERE name='should_not_exist'"
         ).fetchone()
         assert row is None

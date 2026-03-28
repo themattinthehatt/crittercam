@@ -100,16 +100,27 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   ├── DESIGN.md
 │   ├── PHASES.md
 │   └── DECISIONS.md
+├── CLAUDE.md
 ├── crittercam/
 │   ├── cli.py                       # entry point: `crittercam` command
 │   ├── config.py                    # config load/save (~/.config/crittercam/config.toml)
 │   ├── pipeline/
 │   │   ├── db.py                    # connection + migration runner
+│   │   ├── exif.py                  # EXIF extraction (Browning camera support)
+│   │   ├── ingest.py                # Phase 1 ingestion logic
 │   │   └── migrations/
 │   │       └── 0001_initial_schema.sql
-│   ├── classifier/                  # swappable classifier modules
+│   ├── classifier/                  # swappable classifier modules (Phase 2)
 │   └── web/                         # dashboard interface (Phase 4)
 ├── tests/
+│   ├── test_cli.py
+│   ├── test_config.py
+│   └── pipeline/                    # mirrors crittercam/pipeline/
+│       ├── assets/                  # sample images (e.g. BROWNING.JPG)
+│       ├── conftest.py
+│       ├── test_db.py
+│       ├── test_exif.py
+│       └── test_ingest.py
 ├── pyproject.toml
 └── README.md
 ```

@@ -122,11 +122,16 @@ foo(
 
 ### Unit Tests
 - Use pytest framework
-- Test directory should mirror structure of code directory (i.e. one test file for each module)
+- Test directory structure must mirror the source package structure exactly:
+  - `crittercam/pipeline/db.py` → `tests/pipeline/test_db.py`
+  - `crittercam/pipeline/exif.py` → `tests/pipeline/test_exif.py`
+  - `crittercam/cli.py` → `tests/test_cli.py`
+  - Each subdirectory under `tests/` must have an `__init__.py`
 - Test file naming: `test_<module_name>.py`
 - Test function naming: `test_<scenario>`
 - Create test classes for each function
-- Use fixtures for common test data
+- Use fixtures for common test data; place fixtures in a `conftest.py` in the same directory as the tests that use them
+- Test assets (e.g. sample images) live in an `assets/` subdirectory alongside the tests that use them
 - Aim for high test coverage
 - Test both success and failure cases
 
@@ -217,6 +222,14 @@ crittercam/
 │   ├── classifier/     # swappable classifier modules
 │   └── web/            # dashboard interface
 └── tests/
+    ├── test_cli.py
+    ├── test_config.py
+    └── pipeline/       # mirrors crittercam/pipeline/
+        ├── assets/     # sample images and other test fixtures
+        ├── conftest.py
+        ├── test_db.py
+        ├── test_exif.py
+        └── test_ingest.py
 ```
 
 ### File Naming

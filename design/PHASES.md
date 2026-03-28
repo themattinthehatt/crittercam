@@ -1,7 +1,7 @@
 # Project Phases — Status Tracker
 
 ## Phase 1 — Ingestion pipeline
-**Status**: In progress
+**Status**: Complete
 
 ### Scope
 - Accept a source directory (manually pointed at offloaded SD card contents)
@@ -18,15 +18,19 @@
 
 ### Done
 - [x] `crittercam setup` — prompts for data_root, writes config, initialises database
-- [x] `crittercam ingest --source PATH` CLI stub registered
+- [x] `crittercam ingest --source PATH` — finds JPEGs, deduplicates by SHA-256, copies to archive, writes DB rows, enqueues detection jobs
+- [x] EXIF extraction — timestamp, dimensions, camera make/model, temperature (Browning UserComment)
+- [x] mtime fallback when EXIF timestamp is absent
+- [x] Destination collision detection (different hash, same filename + date → error, not silent overwrite)
+- [x] Idempotency verified — re-running on the same source produces no duplicates
 
 ### Open questions
 - [ ] How to detect SD card mount reliably on this OS?
 
 ### Completion criteria
-- Point CLI at source directory → images appear in `images/` tree, organized by date
-- Re-running on the same source adds no duplicates
-- Each new image produces a pending detection job in `processing_jobs`
+- [x] Point CLI at source directory → images appear in `images/` tree, organized by date
+- [x] Re-running on the same source adds no duplicates
+- [x] Each new image produces a pending detection job in `processing_jobs`
 
 ---
 
