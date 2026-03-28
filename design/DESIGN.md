@@ -134,14 +134,19 @@ One row per file. No processing state — that lives in `processing_jobs`.
 
 ```sql
 CREATE TABLE images (
-    id          INTEGER PRIMARY KEY,
-    path        TEXT NOT NULL UNIQUE,   -- relative to data_root
-    filename    TEXT NOT NULL,
-    captured_at TEXT,                   -- EXIF timestamp, ISO 8601, nullable
-    ingested_at TEXT NOT NULL,
-    file_hash   TEXT NOT NULL UNIQUE,   -- SHA-256, used for deduplication
-    file_size   INTEGER NOT NULL,
-    thumb_path  TEXT                    -- relative to data_root
+    id            INTEGER PRIMARY KEY,
+    path          TEXT    NOT NULL UNIQUE,   -- relative to data_root
+    filename      TEXT    NOT NULL,
+    captured_at   TEXT,                      -- EXIF DateTimeOriginal, ISO 8601, nullable
+    ingested_at   TEXT    NOT NULL,
+    file_hash     TEXT    NOT NULL UNIQUE,   -- SHA-256, used for deduplication
+    file_size     INTEGER NOT NULL,
+    width         INTEGER,                   -- pixels
+    height        INTEGER,                   -- pixels
+    camera_make   TEXT,                      -- EXIF Make, e.g. 'BROWNING'
+    camera_model  TEXT,                      -- EXIF Model, e.g. 'BTC-8EHP5U'
+    temperature_c REAL,                      -- ambient temp from EXIF UserComment
+    thumb_path    TEXT                       -- relative to data_root
 );
 ```
 

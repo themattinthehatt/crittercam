@@ -1,14 +1,19 @@
 -- initial schema: images, detections, processing_jobs
 
 CREATE TABLE images (
-    id          INTEGER PRIMARY KEY,
-    path        TEXT    NOT NULL UNIQUE,
-    filename    TEXT    NOT NULL,
-    captured_at TEXT,
-    ingested_at TEXT    NOT NULL,
-    file_hash   TEXT    NOT NULL UNIQUE,
-    file_size   INTEGER NOT NULL,
-    thumb_path  TEXT
+    id            INTEGER PRIMARY KEY,
+    path          TEXT    NOT NULL UNIQUE,
+    filename      TEXT    NOT NULL,
+    captured_at   TEXT,
+    ingested_at   TEXT    NOT NULL,
+    file_hash     TEXT    NOT NULL UNIQUE,
+    file_size     INTEGER NOT NULL,
+    width         INTEGER,
+    height        INTEGER,
+    camera_make   TEXT,
+    camera_model  TEXT,
+    temperature_c REAL,
+    thumb_path    TEXT
 );
 
 CREATE TABLE detections (
