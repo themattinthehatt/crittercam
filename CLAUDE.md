@@ -205,17 +205,18 @@ def function_name(
 ### Directory layout
 ```
 crittercam/
-├── DESIGN.md
-├── PHASES.md
-├── DECISIONS.md
+├── design/
+│   ├── DESIGN.md
+│   ├── PHASES.md
+│   └── DECISIONS.md
 ├── CLAUDE.md
-├── images/             # raw image archive (YYYY/MM/DD/) — immutable
-├── derived/            # thumbnails and crops (YYYY/MM/DD/)
-├── db/                 # SQLite database
-├── exports/            # CSV / JSON exports
-├── pipeline/           # ingestion + processing code
-├── classifier/         # swappable classifier modules
-└── web/                # dashboard interface
+├── crittercam/
+│   ├── cli.py
+│   ├── config.py
+│   ├── pipeline/       # ingestion + processing code
+│   ├── classifier/     # swappable classifier modules
+│   └── web/            # dashboard interface
+└── tests/
 ```
 
 ### File Naming
@@ -265,6 +266,6 @@ crittercam/
 
 ## Additional Notes
 
-Refer to DESIGN.md, PHASES.md, and DECISIONS.md for architectural context before
-making structural changes. When a decision has been logged in DECISIONS.md, follow
-it; if you believe it should be revisited, flag it rather than working around it silently.
+Refer to design/DESIGN.md, design/PHASES.md, and design/DECISIONS.md for architectural
+context before making structural changes. When a decision has been logged in DECISIONS.md,
+follow it; if you believe it should be revisited, flag it rather than working around it silently.

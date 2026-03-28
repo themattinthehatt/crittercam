@@ -69,9 +69,12 @@ The system has a clean physical boundary:
 
 | Component | Choice | Status |
 |---|---|---|
-| Language | Python | Decided |
+| Language | Python 3.12 | Decided |
+| Build system | setuptools | Decided |
 | Database | SQLite | Decided |
 | AI classifier | MegaDetector (swappable) | Decided |
+| CLI framework | argparse (stdlib) | Decided |
+| Config format | TOML (`tomli-w` for writing) | Decided |
 | Web framework | TBD | Phase 4 |
 
 ## Storage Layout
@@ -83,7 +86,7 @@ The codebase and the data live in separate locations:
 
 All paths stored in the database are relative to `data_root`. The pipeline resolves
 full paths as `config.data_root / record.path`. This makes the dataset portable and
-resilient to the drive remounting at a different absolute path (see Decision 010).
+resilient to the drive remounting at a different absolute path (see DECISIONS.md #010).
 
 ```
 <data_root>/                         # external hard drive
@@ -93,14 +96,36 @@ resilient to the drive remounting at a different absolute path (see Decision 010
 └── exports/                         # CSV / JSON exports
 
 <repo>/                              # git repository on laptop
-├── DESIGN.md
-├── PHASES.md
-├── DECISIONS.md
-├── CLAUDE.md
-├── pipeline/                        # ingestion + processing code
-├── classifier/                      # swappable classifier modules
-└── web/                             # dashboard interface
+├── design/
+│   ├── DESIGN.md
+│   ├── PHASES.md
+│   └── DECISIONS.md
+├── crittercam/
+│   ├── cli.py                       # entry point: `crittercam` command
+│   ├── config.py                    # config load/save (~/.config/crittercam/config.toml)
+│   ├── pipeline/
+│   │   ├── db.py                    # connection + migration runner
+│   │   └── migrations/
+│   │       └── 0001_initial_schema.sql
+│   ├── classifier/                  # swappable classifier modules
+│   └── web/                         # dashboard interface (Phase 4)
+├── tests/
+├── pyproject.toml
+└── README.md
 ```
+
+## Configuration
+
+Runtime configuration lives at `~/.config/crittercam/config.toml` (XDG standard).
+Created by `crittercam setup`, which also initialises the database. The only required
+field is `data_root`:
+
+```toml
+data_root = "/media/mattw/wildlifecam"
+```
+
+All CLI commands read this file automatically. `--data-root` flag overrides it for
+a single run.
 
 ## Database Schema
 

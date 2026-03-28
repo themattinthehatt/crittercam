@@ -1,7 +1,7 @@
 # Project Phases — Status Tracker
 
 ## Phase 1 — Ingestion pipeline
-**Status**: Not started
+**Status**: In progress
 
 ### Scope
 - Accept a source directory (manually pointed at offloaded SD card contents)
@@ -15,6 +15,10 @@
 - Deduplication key: SHA-256 file hash (Decision 009)
 - Pipeline is batch-triggered (manual), not a continuous watcher (Decision 005)
 - Paths stored relative to data_root (Decision 010)
+
+### Done
+- [x] `crittercam setup` — prompts for data_root, writes config, initialises database
+- [x] `crittercam ingest --source PATH` CLI stub registered
 
 ### Open questions
 - [ ] How to detect SD card mount reliably on this OS?
@@ -54,24 +58,30 @@
 ---
 
 ## Phase 3 — Storage layer
-**Status**: Not started
+**Status**: In progress
 
 ### Scope
 - SQLite schema implementation (images, detections, processing_jobs)
 - Migration infrastructure
 - CSV / JSON export scripts
 
+### Done
+- [x] Schema designed and implemented (`0001_initial_schema.sql`)
+- [x] Migration runner (`pipeline/db.py`) — applies pending migrations in order, idempotent
+- [x] `crittercam setup` runs migrations on first run and on re-run
+
 ### Resolved
 - Schema designed: see DESIGN.md for full DDL
 - Paths stored relative to data_root; database lives on external drive with images (Decision 010)
 - No BLOBs; derived assets on disk, referenced by path (Decision 006)
+- Migration tool: hand-rolled versioned SQL scripts (Decision 015)
 
-### Open questions
-- [ ] Migration tool: Alembic vs hand-rolled versioned scripts?
+### Remaining
+- [ ] CSV / JSON export scripts
 
 ### Completion criteria
-- Schema created from scratch by a single command
-- Migrations apply cleanly to an existing database
+- Schema created from scratch by a single command ✓
+- Migrations apply cleanly to an existing database ✓
 - All detections queryable by species, date, confidence
 - Full dataset exportable to CSV in one command
 

@@ -309,4 +309,71 @@ complex query logic. `is_active = 1` is the simple filter that achieves this.
 
 ---
 
+## 013 — argparse over third-party CLI frameworks
+
+**Date**: 2026-03-28
+**Decision**: Use Python's stdlib `argparse` for the CLI, not Click or Typer
+
+**Considered**:
+- Click — popular, decorator-based, good UX; adds a dependency
+- Typer — Click wrapper with type annotations; adds two dependencies
+- argparse — verbose but zero dependencies; ships with Python
+
+**Rationale**: The CLI has a small number of subcommands and the project philosophy
+is to minimise dependencies. argparse is sufficient and means one fewer thing to
+install, update, or break.
+
+---
+
+## 014 — Config file at ~/.config/crittercam/config.toml
+
+**Date**: 2026-03-28
+**Decision**: Runtime config lives at `~/.config/crittercam/config.toml`, following
+the XDG base directory convention
+
+**Considered**:
+- `~/.crittercamrc` — common but clutters the home directory
+- `<repo>/.env` or `<repo>/config.toml` — couples config to the repo; wrong for
+  user-specific paths like `data_root`
+- `~/.config/crittercam/config.toml` — XDG standard; clean, predictable, user-scoped
+
+**Rationale**: Config is user-specific (it contains a path to an external drive) and
+should not live in the repo. The XDG location is standard on Linux and works on macOS.
+
+**Implications**:
+- Created by `crittercam setup`; not checked into git
+- CLI flag `--data-root` overrides `data_root` for a single invocation
+- `tomllib` (stdlib, read-only) + `tomli-w` (write) handle serialisation
+
+---
+
+## 015 — Hand-rolled versioned migration scripts over Alembic
+
+**Date**: 2026-03-28
+**Decision**: Database migrations are plain numbered SQL files applied by a small
+custom runner, not managed by Alembic
+
+**Considered**:
+- Alembic — industry-standard migration tool; auto-generates migrations from ORM
+  models; significant learning curve and configuration overhead
+- Hand-rolled versioned SQL files — transparent, no new concepts, ~50 lines of Python
+
+**Rationale**: Schema changes will be infrequent and deliberate. Alembic's power
+(auto-generation, ORM integration) is not needed here. A simple version table plus
+numbered SQL files is easier to understand and debug, which matters for a learning
+project.
+
+**Structure**:
+```
+crittercam/pipeline/migrations/
+    0001_initial_schema.sql
+    0002_<description>.sql
+    ...
+```
+
+The runner checks `schema_migrations` for applied versions, runs pending files in
+order, and records each. Safe to re-run — already-applied migrations are skipped.
+
+---
+
 <!-- Add new decisions below this line, incrementing the number -->
