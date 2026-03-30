@@ -7,6 +7,8 @@ import pytest
 
 from crittercam.classifier.base import Detection
 
+_MOCK_PIL_IMAGE = MagicMock(name='pil_image')
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,10 +54,13 @@ def mock_speciesnet():
         'speciesnet.detector': MagicMock(SpeciesNetDetector=MagicMock(return_value=mock_detector_inst)),
         'speciesnet.classifier': MagicMock(SpeciesNetClassifier=MagicMock(return_value=mock_classifier_inst)),
         'speciesnet.ensemble': MagicMock(SpeciesNetEnsemble=MagicMock(return_value=mock_ensemble_inst)),
-        'speciesnet.utils': MagicMock(load_rgb_image=MagicMock(return_value=MagicMock())),
     }
 
-    with patch.dict('sys.modules', stub_modules):
+    mock_pil_module = MagicMock()
+    mock_pil_module.Image.open.return_value.convert.return_value = _MOCK_PIL_IMAGE
+
+    with patch.dict('sys.modules', stub_modules), \
+            patch('PIL.Image.open', mock_pil_module.Image.open):
         yield {
             'detector': mock_detector_inst,
             'classifier': mock_classifier_inst,

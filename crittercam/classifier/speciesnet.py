@@ -56,13 +56,18 @@ class SpeciesNetAdapter:
         Raises:
             RuntimeError: if SpeciesNet reports component failures
         """
-        from speciesnet.utils import load_rgb_image
+        import PIL.Image
 
         filepath = str(image_path)
-        img = load_rgb_image(filepath)
 
-        detection_result = self._detector.predict(filepath, img)
-        classification_result = self._classifier_model.predict(filepath, img)
+        # load image once; convert to RGB to handle MPO/CMYK/palette modes
+        pil_img = PIL.Image.open(image_path).convert('RGB')
+
+        # each component has its own preprocess() that returns a PreprocessedImage
+        detection_result = self._detector.predict(filepath, self._detector.preprocess(pil_img))
+        classification_result = self._classifier_model.predict(
+            filepath, self._classifier_model.preprocess(pil_img),
+        )
 
         geolocation_result: dict[str, str] = {}
         if self._country:

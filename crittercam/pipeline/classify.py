@@ -28,6 +28,42 @@ class ClassifySummary:
     errors: dict[str, str] = field(default_factory=dict)
 
 
+def reset_errors(conn: sqlite3.Connection) -> int:
+    """Reset all errored detection jobs back to pending so they will be retried.
+
+    Args:
+        conn: open database connection
+
+    Returns:
+        number of jobs reset
+    """
+    cursor = conn.execute(
+        "UPDATE processing_jobs SET status = 'pending', started_at = NULL, "
+        "completed_at = NULL, error_msg = NULL "
+        "WHERE job_type = 'detection' AND status = 'error'"
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
+def reset_all(conn: sqlite3.Connection) -> int:
+    """Reset all detection jobs (done and error) back to pending for a full rerun.
+
+    Args:
+        conn: open database connection
+
+    Returns:
+        number of jobs reset
+    """
+    cursor = conn.execute(
+        "UPDATE processing_jobs SET status = 'pending', started_at = NULL, "
+        "completed_at = NULL, error_msg = NULL "
+        "WHERE job_type = 'detection' AND status IN ('done', 'error')"
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
 def classify_pending(
     data_root: Path,
     conn: sqlite3.Connection,

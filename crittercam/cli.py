@@ -1,6 +1,7 @@
 """Command-line interface for crittercam."""
 
 import argparse
+import logging
 import re
 import sys
 from pathlib import Path
@@ -44,6 +45,11 @@ _ADMIN1_RE = re.compile(r'^[A-Z0-9]{1,8}$')
 
 def main() -> None:
     """Entry point for the crittercam CLI."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s:%(name)s:%(message)s',
+    )
+
     parser = argparse.ArgumentParser(
         prog='crittercam',
         description='Backyard wildlife camera trap pipeline.',
@@ -103,6 +109,16 @@ def main() -> None:
         default=0.15,
         metavar='FLOAT',
         help='fractional padding added to each side of detection bbox when cropping (default: 0.15)',
+    )
+    classify_parser.add_argument(
+        '--retry-errors',
+        action='store_true',
+        help='reset previously errored detection jobs to pending before classifying',
+    )
+    classify_parser.add_argument(
+        '--reclassify-all',
+        action='store_true',
+        help='reset all detection jobs (done and error) to pending before classifying',
     )
 
     args = parser.parse_args()
@@ -187,7 +203,7 @@ def cmd_classify(args: argparse.Namespace) -> None:
         args: parsed command-line arguments
     """
     from crittercam.classifier.speciesnet import SpeciesNetAdapter
-    from crittercam.pipeline.classify import classify_pending
+    from crittercam.pipeline.classify import classify_pending, reset_all, reset_errors
 
     try:
         config = load(CONFIG_PATH)
@@ -211,6 +227,14 @@ def cmd_classify(args: argparse.Namespace) -> None:
     classifier = SpeciesNetAdapter(country=country, admin1_region=admin1_region)
 
     conn = connect(config.db_path)
+    if args.reclassify_all:
+        n = reset_all(conn)
+        if n:
+            print(f'Reset {n} job(s) to pending for full reclassification.')
+    elif args.retry_errors:
+        n = reset_errors(conn)
+        if n:
+            print(f'Reset {n} errored job(s) to pending.')
     try:
         summary = classify_pending(
             data_root=config.data_root,

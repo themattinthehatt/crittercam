@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from crittercam.classifier.base import Detection
-from crittercam.pipeline.classify import ClassifySummary, classify_pending
+from crittercam.pipeline.classify import ClassifySummary, classify_pending, reset_all, reset_errors
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +243,153 @@ class TestClassifyPending:
         # Assert
         crop_path_str = db.execute('SELECT crop_path FROM detections').fetchone()['crop_path']
         assert crop_path_str is None
+
+class TestResetErrors:
+    """Test the reset_errors function."""
+
+    def test_resets_errored_jobs_to_pending(self, db, data_root, pending_image):
+        # Arrange — mark the job as errored
+        db.execute(
+            "UPDATE processing_jobs SET status = 'error', error_msg = 'boom' WHERE id = ?",
+            (pending_image['job_id'],),
+        )
+        db.commit()
+
+        # Act
+        n = reset_errors(db)
+
+        # Assert
+        assert n == 1
+        job = db.execute(
+            'SELECT status, error_msg, started_at FROM processing_jobs WHERE id = ?',
+            (pending_image['job_id'],),
+        ).fetchone()
+        assert job['status'] == 'pending'
+        assert job['error_msg'] is None
+        assert job['started_at'] is None
+
+    def test_does_not_reset_done_jobs(self, db, data_root, pending_image):
+        # Arrange
+        db.execute(
+            "UPDATE processing_jobs SET status = 'done' WHERE id = ?",
+            (pending_image['job_id'],),
+        )
+        db.commit()
+
+        # Act
+        n = reset_errors(db)
+
+        # Assert
+        assert n == 0
+        status = db.execute(
+            'SELECT status FROM processing_jobs WHERE id = ?',
+            (pending_image['job_id'],),
+        ).fetchone()['status']
+        assert status == 'done'
+
+    def test_returns_count_of_reset_jobs(self, db, data_root, make_jpeg):
+        # Arrange — create two errored jobs
+        for i, name in enumerate(['A.jpg', 'B.jpg']):
+            img_path = data_root / 'images' / '2026' / '03' / '15' / name
+            make_jpeg(img_path)
+            db.execute(
+                'INSERT INTO images (path, filename, ingested_at, file_hash, file_size) '
+                'VALUES (?, ?, ?, ?, ?)',
+                (f'images/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
+            )
+            db.commit()
+            image_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+            db.execute(
+                "INSERT INTO processing_jobs (image_id, job_type, status, error_msg) "
+                "VALUES (?, 'detection', 'error', 'fail')",
+                (image_id,),
+            )
+            db.commit()
+
+        # Act
+        n = reset_errors(db)
+
+        # Assert
+        assert n == 2
+
+
+class TestResetAll:
+    """Test the reset_all function."""
+
+    def test_resets_done_jobs_to_pending(self, db, data_root, pending_image):
+        # Arrange
+        db.execute(
+            "UPDATE processing_jobs SET status = 'done' WHERE id = ?",
+            (pending_image['job_id'],),
+        )
+        db.commit()
+
+        # Act
+        n = reset_all(db)
+
+        # Assert
+        assert n == 1
+        job = db.execute(
+            'SELECT status, error_msg, started_at FROM processing_jobs WHERE id = ?',
+            (pending_image['job_id'],),
+        ).fetchone()
+        assert job['status'] == 'pending'
+        assert job['error_msg'] is None
+        assert job['started_at'] is None
+
+    def test_resets_errored_jobs_to_pending(self, db, data_root, pending_image):
+        # Arrange
+        db.execute(
+            "UPDATE processing_jobs SET status = 'error', error_msg = 'boom' WHERE id = ?",
+            (pending_image['job_id'],),
+        )
+        db.commit()
+
+        # Act
+        n = reset_all(db)
+
+        # Assert
+        assert n == 1
+        assert db.execute(
+            'SELECT status FROM processing_jobs WHERE id = ?', (pending_image['job_id'],)
+        ).fetchone()['status'] == 'pending'
+
+    def test_does_not_reset_pending_jobs(self, db, data_root, pending_image):
+        # Arrange — job is already pending (default from fixture)
+
+        # Act
+        n = reset_all(db)
+
+        # Assert
+        assert n == 0
+
+    def test_returns_total_count(self, db, data_root, make_jpeg):
+        # Arrange — one done job and one error job
+        for i, (name, status) in enumerate([('A.jpg', 'done'), ('B.jpg', 'error')]):
+            img_path = data_root / 'images' / '2026' / '03' / '15' / name
+            make_jpeg(img_path)
+            db.execute(
+                'INSERT INTO images (path, filename, ingested_at, file_hash, file_size) '
+                'VALUES (?, ?, ?, ?, ?)',
+                (f'images/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
+            )
+            db.commit()
+            image_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+            db.execute(
+                "INSERT INTO processing_jobs (image_id, job_type, status) VALUES (?, 'detection', ?)",
+                (image_id, status),
+            )
+            db.commit()
+
+        # Act
+        n = reset_all(db)
+
+        # Assert
+        assert n == 2
+
+
+class TestClassifyPendingEmpty:
+    """Test edge cases for classify_pending."""
 
     def test_empty_detection_list_marks_job_done(self, db, data_root, pending_image):
         # Arrange — classifier returns no prediction (not a failure, just no result)
