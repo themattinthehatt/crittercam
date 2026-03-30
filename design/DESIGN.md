@@ -108,16 +108,22 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   ├── db.py                    # connection + migration runner
 │   │   ├── exif.py                  # EXIF extraction (Browning camera support)
 │   │   ├── ingest.py                # Phase 1 ingestion logic
+│   │   ├── classify.py              # Phase 2 classification + derived asset generation
 │   │   └── migrations/
 │   │       └── 0001_initial_schema.sql
-│   ├── classifier/                  # swappable classifier modules (Phase 2)
+│   ├── classifier/
+│   │   ├── base.py                  # Detection dataclass + Classifier Protocol
+│   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
 │   └── web/                         # dashboard interface (Phase 4)
 ├── tests/
 │   ├── test_cli.py
 │   ├── test_config.py
+│   ├── classifier/                  # mirrors crittercam/classifier/
+│   │   └── test_speciesnet.py
 │   └── pipeline/                    # mirrors crittercam/pipeline/
 │       ├── assets/                  # sample images (e.g. BROWNING.JPG)
 │       ├── conftest.py
+│       ├── test_classify.py
 │       ├── test_db.py
 │       ├── test_exif.py
 │       └── test_ingest.py
@@ -170,10 +176,10 @@ CREATE TABLE detections (
     image_id      INTEGER NOT NULL REFERENCES images(id),
     label         TEXT NOT NULL,
     confidence    REAL NOT NULL,
-    bbox_x1       REAL,                 -- normalized coords (0–1)
-    bbox_y1       REAL,
-    bbox_x2       REAL,
-    bbox_y2       REAL,
+    bbox_x        REAL,                 -- normalized (x, y, w, h) in [0, 1]
+    bbox_y        REAL,
+    bbox_w        REAL,
+    bbox_h        REAL,
     crop_path     TEXT,                 -- relative to data_root
     model_name    TEXT NOT NULL,
     model_version TEXT,

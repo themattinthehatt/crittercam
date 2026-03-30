@@ -55,6 +55,30 @@ class TestSave:
         # Assert
         assert loaded.data_root == Path('/data/wildlife')
 
+    def test_saves_country_and_admin1_region(self, tmp_path):
+        # Arrange
+        config = Config(data_root=Path('/data/wildlife'), country='USA', admin1_region='CT')
+        config_path = tmp_path / 'config.toml'
+
+        # Act
+        save(config, config_path)
+        loaded = load(config_path)
+
+        # Assert
+        assert loaded.country == 'USA'
+        assert loaded.admin1_region == 'CT'
+
+    def test_omits_country_when_none(self, tmp_path):
+        # Arrange
+        config = Config(data_root=Path('/data/wildlife'))
+        config_path = tmp_path / 'config.toml'
+
+        # Act
+        save(config, config_path)
+
+        # Assert — file should not contain 'country' key
+        assert 'country' not in config_path.read_text()
+
 
 class TestLoad:
     """Test the load function."""
@@ -88,3 +112,15 @@ class TestLoad:
 
         # Assert
         assert isinstance(config.data_root, Path)
+
+    def test_country_defaults_to_none_when_absent(self, tmp_path):
+        # Arrange — config written without country field
+        config_path = tmp_path / 'config.toml'
+        save(Config(data_root=Path('/data/wildlife')), config_path)
+
+        # Act
+        config = load(config_path)
+
+        # Assert
+        assert config.country is None
+        assert config.admin1_region is None

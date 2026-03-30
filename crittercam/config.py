@@ -15,9 +15,13 @@ class Config:
 
     Attributes:
         data_root: root directory for the image archive and database
+        country: ISO 3166-1 alpha-3 country code for SpeciesNet geofencing (e.g. 'USA')
+        admin1_region: state/province abbreviation for geofencing (e.g. 'CT')
     """
 
     data_root: Path
+    country: str | None = None
+    admin1_region: str | None = None
 
     @property
     def db_path(self) -> Path:
@@ -25,7 +29,7 @@ class Config:
         return self.data_root / 'db' / 'crittercam.db'
 
 
-def load(config_path: Path = CONFIG_PATH) -> Config:
+def load(config_path: Path = CONFIG_PATH) -> 'Config':
     """Load configuration from a TOML file.
 
     Args:
@@ -40,10 +44,14 @@ def load(config_path: Path = CONFIG_PATH) -> Config:
     """
     with open(config_path, 'rb') as f:
         data = tomllib.load(f)
-    return Config(data_root=Path(data['data_root']))
+    return Config(
+        data_root=Path(data['data_root']),
+        country=data.get('country'),
+        admin1_region=data.get('admin1_region'),
+    )
 
 
-def save(config: Config, config_path: Path = CONFIG_PATH) -> None:
+def save(config: 'Config', config_path: Path = CONFIG_PATH) -> None:
     """Save configuration to a TOML file.
 
     Creates parent directories if they do not exist.
@@ -53,6 +61,10 @@ def save(config: Config, config_path: Path = CONFIG_PATH) -> None:
         config_path: path to write the config file
     """
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    data = {'data_root': str(config.data_root)}
+    data: dict = {'data_root': str(config.data_root)}
+    if config.country is not None:
+        data['country'] = config.country
+    if config.admin1_region is not None:
+        data['admin1_region'] = config.admin1_region
     with open(config_path, 'wb') as f:
         tomli_w.dump(data, f)

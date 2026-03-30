@@ -107,6 +107,11 @@ foo(
 - Derived assets in `derived/YYYY/MM/DD/` may be regenerated freely
 - All corrections and annotations live in the database
 
+### SQL parameters
+- Always use named parameters (`:name`) rather than positional placeholders (`?`) for SQL queries
+- Pass parameters as a dict: `conn.execute('... WHERE id = :id', {'id': row_id})`
+- Positional `?` is only acceptable for single-parameter queries where the mapping is unambiguous
+
 ### Derived assets
 - Derived assets (thumbnails, detection crops) are written to disk and referenced by path in the DB — never stored as BLOBs
 - Directory structure mirrors the image archive:

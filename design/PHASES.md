@@ -35,29 +35,40 @@
 ---
 
 ## Phase 2 — Processing & species ID
-**Status**: Not started
+**Status**: Complete
 
 ### Scope
 - Batch worker reads pending detection jobs from `processing_jobs`
-- Runs classifier (MegaDetector) via the swappable classifier interface
+- Runs classifier (SpeciesNet) via the swappable classifier interface
 - Writes detection rows to `detections` table; marks prior rows `is_active = 0` if re-running
 - Generates derived assets: full-image thumbnail, padded crop per detection
 - Derived asset paths stored relative to data_root
 - Marks `processing_jobs` row as done (or error)
 
 ### Resolved
-- Classifier is a swappable component behind a clean interface (Decision 002)
-- Images with no detections: no detection rows inserted; derived: thumbnail only
+- Classifier: SpeciesNet (google/cameratrapai), run locally (Decisions 002, 016)
+- One detection row per image; top MegaDetector bbox used for crop (Decision 017)
+- Bounding boxes stored as (x, y, w, h) normalized — SpeciesNet's native format
+- Geofencing via country + admin1_region in config (country='USA', admin1_region='CT')
 - `is_active` flag distinguishes current model run from prior runs (Decision 012)
 - `processing_jobs` tracks state; results live in `detections` (Decision 011)
+- Crop padding configurable via `--crop-padding` CLI flag (default 0.15)
 
-### Open questions
-- [ ] Run MegaDetector locally or call an API?
+### Done
+- [x] `Classifier` Protocol + `Detection` dataclass (`classifier/base.py`)
+- [x] `SpeciesNetAdapter` wrapping detector + classifier + ensemble (`classifier/speciesnet.py`)
+- [x] `classify_pending()` — processes all pending jobs, writes detection rows, generates assets
+- [x] `crittercam classify` CLI subcommand with `--country`, `--admin1-region`, `--crop-padding` overrides
+- [x] `crittercam setup` updated to prompt for country and admin1_region
+- [x] Country validation against full ISO 3166-1 alpha-3 code list
+- [x] Thumbnail generation (max 640px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`)
+- [x] Detection crop generation with configurable padding (`derived/YYYY/MM/DD/<stem>_det001.jpg`)
+- [x] Thumbnail path recorded in `images.thumb_path`; crop path in `detections.crop_path`
 
 ### Completion criteria
-- Pending detection jobs → species label + confidence score in `detections` within ~60 seconds
-- Images with no detection have no detection rows (derivable at query time)
-- Re-running with a new model produces new rows; old rows marked inactive
+- [x] Pending detection jobs → species label + confidence score in `detections`
+- [x] Thumbnails and crops written to `derived/` tree and referenced in DB
+- [x] Re-running with a new model produces new rows; old rows marked inactive
 
 ---
 

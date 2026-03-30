@@ -20,8 +20,8 @@ class TestCmdSetup:
         monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
-        # Act
-        with patch('builtins.input', return_value=str(data_root)):
+        # Act — provide data_root then skip country
+        with patch('builtins.input', side_effect=[str(data_root), '']):
             cmd_setup()
 
         # Assert — config written
@@ -39,7 +39,7 @@ class TestCmdSetup:
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act
-        with patch('builtins.input', return_value=str(data_root)):
+        with patch('builtins.input', side_effect=[str(data_root), '']):
             cmd_setup()
 
         # Assert
@@ -54,13 +54,43 @@ class TestCmdSetup:
         assert {'images', 'detections', 'processing_jobs'}.issubset(tables)
         conn.close()
 
+    def test_saves_country_and_admin1_region(self, tmp_path, monkeypatch):
+        # Arrange
+        config_path = tmp_path / 'config.toml'
+        data_root = tmp_path / 'data'
+        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
+
+        # Act — provide data_root, country, admin1_region
+        with patch('builtins.input', side_effect=[str(data_root), 'USA', 'CT']):
+            cmd_setup()
+
+        # Assert
+        config = load(config_path)
+        assert config.country == 'USA'
+        assert config.admin1_region == 'CT'
+
+    def test_invalid_country_reprompts(self, tmp_path, monkeypatch):
+        # Arrange
+        config_path = tmp_path / 'config.toml'
+        data_root = tmp_path / 'data'
+        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
+
+        # Act — bad country first, then valid, then skip admin1
+        with patch('builtins.input', side_effect=[str(data_root), 'XX', 'USA', '']):
+            cmd_setup()
+
+        # Assert — ended up with the valid code
+        assert load(config_path).country == 'USA'
+
     def test_prompts_to_overwrite_when_config_exists(self, tmp_path, monkeypatch):
         # Arrange — write an existing config
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
         monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
-        with patch('builtins.input', return_value=str(data_root)):
+        with patch('builtins.input', side_effect=[str(data_root), '']):
             cmd_setup()
 
         # Act — run setup again, decline overwrite
@@ -79,12 +109,11 @@ class TestCmdSetup:
         data_root_new = tmp_path / 'new'
         monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
-        with patch('builtins.input', return_value=str(data_root_old)):
+        with patch('builtins.input', side_effect=[str(data_root_old), '']):
             cmd_setup()
 
-        # Act — run setup again, confirm overwrite, provide new data root
-        inputs = iter(['y', str(data_root_new)])
-        with patch('builtins.input', side_effect=inputs):
+        # Act — confirm overwrite, new data root, skip country
+        with patch('builtins.input', side_effect=['y', str(data_root_new), '']):
             cmd_setup()
 
         # Assert
@@ -96,7 +125,7 @@ class TestCmdSetup:
         monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
-        # Act / Assert
+        # Act / Assert — empty data root triggers sys.exit(1) before country prompt
         with patch('builtins.input', return_value=''):
             with pytest.raises(SystemExit) as exc_info:
                 cmd_setup()

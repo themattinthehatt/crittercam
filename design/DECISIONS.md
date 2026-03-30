@@ -376,4 +376,93 @@ order, and records each. Safe to re-run — already-applied migrations are skipp
 
 ---
 
+## 016 — SpeciesNet chosen as Phase 2 classifier
+
+**Date**: 2026-03-28
+**Decision**: Use SpeciesNet (google/cameratrapai) as the Phase 2 classifier,
+running fully locally
+
+**Considered**:
+- MegaDetector alone — gives bounding boxes and animal/human/vehicle labels but
+  no species ID; good escape hatch if SpeciesNet setup proves painful, but loses
+  the main value of Phase 2
+- MegaDetector + iNaturalist classifier (DIY ensemble) — iNaturalist models are
+  trained on observer-submitted photos, not camera trap images; IR, motion blur,
+  and small-subject-in-large-frame distributions differ significantly; would also
+  require building our own ensemble logic
+- Wildlife Insights API — hosted deployment of the same SpeciesNet model; ruled
+  out because it sends images to Google's servers (conflicts with Decision 004)
+  and adds a network dependency to the batch pipeline
+- General-purpose vision LLMs (GPT-4o, Gemini Vision) — cloud dependency,
+  unstructured output, uncalibrated confidence scores, no bounding boxes;
+  ruled out for the same reasons as Wildlife Insights API
+
+**Rationale**: SpeciesNet is the strongest fit for a fixed backyard deployment:
+- Trained on 65M+ camera trap images (not observer photos), so the image
+  distribution matches closely
+- Geofencing support — passing country/state filters implausible predictions
+  at the ensemble step; valuable for a single fixed location
+- Taxonomic rollup — falls back to genus/family rather than guessing wrong at
+  species level; correct behavior for a dataset that needs to be trusted over time
+- Blank detection — handles wind-triggered empty frames explicitly, which camera
+  traps produce in volume
+- Returns bounding boxes (via MegaDetector) feeding directly into crop
+  generation (Decision 007) without additional wiring
+- Fully local, no API cost, no data leaves the machine (consistent with
+  Decision 004)
+
+**Implications**:
+- Model weights download from Kaggle on first run; can be pre-downloaded for
+  offline operation
+- PyTorch is a significant dependency; GPU optional but recommended for batch
+  throughput
+- The classifier interface (Decision 002) wraps SpeciesNet so it can be swapped
+  later without touching the pipeline
+
+---
+
+## 017 — SpeciesNet output mapping: one detection row per image, top bbox
+
+**Date**: 2026-03-29
+**Decision**: Each processed image produces at most one detection row in the
+`detections` table. The species label and confidence come from SpeciesNet's
+single ensemble `prediction` / `prediction_score`. The bounding box columns
+(`bbox_x1`, `bbox_y1`, `bbox_x2`, `bbox_y2`) are populated from the
+highest-confidence MegaDetector detection in the `detections` array. Images
+where SpeciesNet returns `"blank"` or no detections produce a detection row
+with the appropriate label and null bbox columns.
+
+**Considered**:
+- One row per MegaDetector bounding box — SpeciesNet returns multiple boxes
+  when multiple animals are in frame, but only one ensemble `prediction` per
+  image (not per box). This would produce multiple rows all sharing the same
+  species label, which is redundant and misleading.
+- One row per image using the top bbox (chosen) — matches SpeciesNet's actual
+  output granularity. The top detection box is used for crop generation
+  (Decision 007); using the same box for the detection row is consistent.
+- Storing raw top-5 classifications JSON as an additional column — deferred.
+  The structured `prediction` and `confidence` fields cover all current query
+  needs. If top-5 data becomes useful later, a column can be added via migration.
+
+**Rationale**: SpeciesNet's ensemble produces one label per image, not one label
+per animal. Designing the schema around that actual contract avoids fabricating
+a per-box species breakdown the model does not provide. The top-bbox choice is
+consistent with crop generation (Decision 007), which also operates on the
+single highest-confidence detection.
+
+**SpeciesNet fields → detection row mapping**:
+- `prediction`         → `label` (normalized to lowercase)
+- `prediction_score`   → `confidence`
+- `prediction_source`  → not stored (may add later if debugging value is clear)
+- `detections[0].bbox` → `bbox_x/y/w/h` (top detection by `conf`; null if absent)
+- `model_version`      → `model_version`
+- Bbox format: SpeciesNet returns `[xmin, ymin, width, height]` normalized 0–1;
+  stored as-is in `bbox_x/y/w/h` — no conversion required
+
+**Blank and empty frame handling**:
+- `prediction == "blank"` → detection row with `label='blank'`, null bbox, null crop_path
+- Classifier failure → log error in processing_jobs, no detection row inserted
+
+---
+
 <!-- Add new decisions below this line, incrementing the number -->
