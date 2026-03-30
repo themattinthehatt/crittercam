@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from crittercam.classifier.base import Detection
-from crittercam.pipeline.classify import ClassifySummary, classify_pending, reset_all, reset_errors
+from crittercam.pipeline.classify import _generate_crop, classify_pending, reset_all, reset_errors
 
 
 # ---------------------------------------------------------------------------
@@ -206,20 +206,6 @@ class TestClassifyPending:
         assert row['bbox_x'] is None
         assert row['bbox_w'] is None
 
-    def test_generates_thumbnail(self, db, data_root, pending_image):
-        # Arrange
-        classifier = _MockClassifier([Detection(label='turkey', confidence=0.8, bbox=None)])
-
-        # Act
-        classify_pending(data_root, db, classifier)
-
-        # Assert — thumbnail written and path recorded in images table
-        thumb_path_str = db.execute(
-            'SELECT thumb_path FROM images WHERE id = ?', (pending_image['image_id'],)
-        ).fetchone()['thumb_path']
-        assert thumb_path_str is not None
-        assert (data_root / thumb_path_str).exists()
-
     def test_generates_crop_when_bbox_present(self, db, data_root, pending_image):
         # Arrange
         bbox = (0.1, 0.1, 0.5, 0.5)
@@ -243,6 +229,7 @@ class TestClassifyPending:
         # Assert
         crop_path_str = db.execute('SELECT crop_path FROM detections').fetchone()['crop_path']
         assert crop_path_str is None
+
 
 class TestResetErrors:
     """Test the reset_errors function."""
@@ -406,3 +393,74 @@ class TestClassifyPendingEmpty:
             'SELECT status FROM processing_jobs WHERE id = ?', (pending_image['job_id'],)
         ).fetchone()['status']
         assert job_status == 'done'
+
+
+class TestGenerateCrop:
+    """Test the _generate_crop function."""
+
+    def test_returns_none_when_no_detection(self, data_root, make_jpeg):
+        # Arrange
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(64, 64))
+
+        # Act
+        result = _generate_crop(image_abs, image_rel, data_root, detection=None, crop_padding=0.1)
+
+        # Assert
+        assert result is None
+
+    def test_returns_none_when_bbox_is_none(self, data_root, make_jpeg):
+        # Arrange
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(64, 64))
+        detection = Detection(label='blank', confidence=0.99, bbox=None)
+
+        # Act
+        result = _generate_crop(image_abs, image_rel, data_root, detection, crop_padding=0.1)
+
+        # Assert
+        assert result is None
+
+    def test_writes_crop_file_when_bbox_present(self, data_root, make_jpeg):
+        # Arrange
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(200, 200))
+        detection = Detection(label='deer', confidence=0.9, bbox=(0.1, 0.1, 0.5, 0.5))
+
+        # Act
+        result = _generate_crop(image_abs, image_rel, data_root, detection, crop_padding=0.0)
+
+        # Assert
+        assert result is not None
+        assert (data_root / result).exists()
+
+    def test_returns_path_relative_to_data_root(self, data_root, make_jpeg):
+        # Arrange
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(200, 200))
+        detection = Detection(label='deer', confidence=0.9, bbox=(0.1, 0.1, 0.5, 0.5))
+
+        # Act
+        result = _generate_crop(image_abs, image_rel, data_root, detection, crop_padding=0.0)
+
+        # Assert
+        assert not result.is_absolute()
+        assert result == Path('derived/2026/03/15/IMG_001_det001.jpg')
+
+    def test_padding_clamped_to_image_boundary(self, data_root, make_jpeg):
+        # Arrange — bbox near the edge; large padding would go out of bounds
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(200, 200))
+        detection = Detection(label='deer', confidence=0.9, bbox=(0.0, 0.0, 0.2, 0.2))
+
+        # Act — should not raise even with extreme padding
+        result = _generate_crop(image_abs, image_rel, data_root, detection, crop_padding=2.0)
+
+        # Assert
+        assert result is not None
+        assert (data_root / result).exists()

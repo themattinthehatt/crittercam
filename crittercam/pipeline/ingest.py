@@ -8,11 +8,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from PIL import Image
+
 from crittercam.pipeline.exif import read_exif
 
 logger = logging.getLogger(__name__)
 
 _JPEG_SUFFIXES = {'.jpg', '.jpeg'}
+_THUMBNAIL_MAX_SIZE = 320
 
 
 @dataclass
@@ -88,6 +91,8 @@ def ingest(
         shutil.copy2(path, dest_abs)
         logger.info('copied %s → %s', path.name, dest_rel)
 
+        thumb_rel = _generate_thumbnail(dest_abs, dest_rel, data_root)
+
         now = datetime.now(timezone.utc).isoformat(timespec='seconds')
         rows_images.append({
             'path': dest_rel.as_posix(),
@@ -101,6 +106,7 @@ def ingest(
             'camera_make': metadata.camera_make,
             'camera_model': metadata.camera_model,
             'temperature_c': metadata.temperature_c,
+            'thumb_path': thumb_rel.as_posix() if thumb_rel else None,
         })
 
     if not rows_images:
@@ -118,11 +124,11 @@ def ingest(
                     INSERT INTO images (
                         path, filename, captured_at, ingested_at, file_hash,
                         file_size, width, height, camera_make, camera_model,
-                        temperature_c
+                        temperature_c, thumb_path
                     ) VALUES (
                         :path, :filename, :captured_at, :ingested_at, :file_hash,
                         :file_size, :width, :height, :camera_make, :camera_model,
-                        :temperature_c
+                        :temperature_c, :thumb_path
                     )
                     ''',
                     row,
@@ -192,6 +198,34 @@ def _load_existing_hashes(conn: sqlite3.Connection) -> set[str]:
     """
     rows = conn.execute('SELECT file_hash FROM images').fetchall()
     return {row['file_hash'] for row in rows}
+
+
+def _generate_thumbnail(image_abs: Path, image_rel: Path, data_root: Path) -> Path | None:
+    """Generate a thumbnail for a newly ingested image.
+
+    Writes the thumbnail under data_root/derived/ mirroring the image path,
+    e.g. derived/YYYY/MM/DD/<stem>_thumb.jpg.
+
+    Args:
+        image_abs: absolute path to the source image
+        image_rel: path relative to data_root (e.g. images/YYYY/MM/DD/file.jpg)
+        data_root: root of the crittercam data directory
+
+    Returns:
+        path to the thumbnail relative to data_root, or None on failure
+    """
+    try:
+        date_part = image_rel.parent.relative_to('images')
+        derived_dir = data_root / 'derived' / date_part
+        derived_dir.mkdir(parents=True, exist_ok=True)
+        thumb_abs = derived_dir / f'{image_rel.stem}_thumb.jpg'
+        img = Image.open(image_abs).convert('RGB')
+        img.thumbnail((_THUMBNAIL_MAX_SIZE, _THUMBNAIL_MAX_SIZE), Image.LANCZOS)
+        img.save(thumb_abs, format='JPEG', quality=85)
+        return thumb_abs.relative_to(data_root)
+    except Exception as exc:
+        logger.warning('thumbnail generation failed for %s: %s', image_abs.name, exc)
+        return None
 
 
 def _capture_date(metadata, path: Path) -> datetime:

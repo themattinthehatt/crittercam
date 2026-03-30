@@ -12,8 +12,6 @@ from crittercam.classifier.base import Classifier, Detection
 
 logger = logging.getLogger(__name__)
 
-_THUMBNAIL_MAX_SIZE = 320
-
 
 @dataclass
 class ClassifySummary:
@@ -112,7 +110,7 @@ def classify_pending(
 
         try:
             detections = classifier.classify(image_path)
-            thumb_rel, crop_rel = _generate_derived_assets(
+            crop_rel = _generate_crop(
                 image_path=image_path,
                 image_rel_path=Path(job['path']),
                 data_root=data_root,
@@ -133,12 +131,6 @@ def classify_pending(
             'UPDATE detections SET is_active = 0 WHERE image_id = :image_id AND is_active = 1',
             {'image_id': image_id},
         )
-
-        if thumb_rel is not None:
-            conn.execute(
-                'UPDATE images SET thumb_path = :thumb_path WHERE id = :image_id',
-                {'thumb_path': str(thumb_rel), 'image_id': image_id},
-            )
 
         if detections:
             det = detections[0]
@@ -178,26 +170,28 @@ def classify_pending(
     return summary
 
 
-def _generate_derived_assets(
+def _generate_crop(
     image_path: Path,
     image_rel_path: Path,
     data_root: Path,
     detection: Detection | None,
     crop_padding: float,
-) -> tuple[Path | None, Path | None]:
-    """Generate thumbnail and detection crop for an image.
+) -> Path | None:
+    """Generate a padded detection crop for an image.
 
     Args:
         image_path: absolute path to the source image
         image_rel_path: path relative to data_root (e.g. images/2026/03/15/IMG_001.jpg)
-        data_root: root directory; derived assets are written under data_root/derived/
+        data_root: root directory; crop is written under data_root/derived/
         detection: Detection object with bbox for crop generation, or None
         crop_padding: fractional bbox padding for crops
 
     Returns:
-        tuple of (thumb_path_rel, crop_path_rel) relative to data_root;
-        crop_path_rel is None when detection has no bbox
+        path to the crop relative to data_root, or None when detection has no bbox
     """
+    if detection is None or detection.bbox is None:
+        return None
+
     date_part = image_rel_path.parent.relative_to('images')
     stem = image_rel_path.stem
     derived_dir = data_root / 'derived' / date_part
@@ -206,27 +200,17 @@ def _generate_derived_assets(
     img = Image.open(image_path)
     img_w, img_h = img.size
 
-    thumb_abs = derived_dir / f'{stem}_thumb.jpg'
-    thumb = img.copy()
-    thumb.thumbnail((_THUMBNAIL_MAX_SIZE, _THUMBNAIL_MAX_SIZE), Image.LANCZOS)
-    thumb.save(thumb_abs, format='JPEG', quality=85)
-    thumb_rel = thumb_abs.relative_to(data_root)
-
-    crop_rel = None
-    if detection is not None and detection.bbox is not None:
-        x, y, w, h = detection.bbox
-        pad_x = w * crop_padding
-        pad_y = h * crop_padding
-        x1 = max(0.0, x - pad_x) * img_w
-        y1 = max(0.0, y - pad_y) * img_h
-        x2 = min(1.0, x + w + pad_x) * img_w
-        y2 = min(1.0, y + h + pad_y) * img_h
-        crop = img.crop((x1, y1, x2, y2))
-        crop_abs = derived_dir / f'{stem}_det001.jpg'
-        crop.save(crop_abs, format='JPEG', quality=85)
-        crop_rel = crop_abs.relative_to(data_root)
-
-    return thumb_rel, crop_rel
+    x, y, w, h = detection.bbox
+    pad_x = w * crop_padding
+    pad_y = h * crop_padding
+    x1 = max(0.0, x - pad_x) * img_w
+    y1 = max(0.0, y - pad_y) * img_h
+    x2 = min(1.0, x + w + pad_x) * img_w
+    y2 = min(1.0, y + h + pad_y) * img_h
+    crop = img.crop((x1, y1, x2, y2))
+    crop_abs = derived_dir / f'{stem}_det001.jpg'
+    crop.save(crop_abs, format='JPEG', quality=85)
+    return crop_abs.relative_to(data_root)
 
 
 def _now() -> str:

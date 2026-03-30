@@ -1,6 +1,7 @@
 """Tests for crittercam.pipeline.ingest."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +10,7 @@ from PIL import Image
 from crittercam.pipeline.exif import ImageMetadata
 from crittercam.pipeline.ingest import (
     _find_jpegs,
+    _generate_thumbnail,
     _hash_file,
     ingest,
 )
@@ -236,3 +238,90 @@ class TestIngest:
         assert summary.ingested == 0
         assert summary.skipped == 0
         assert summary.errors == {}
+
+    def test_thumbnail_generated_on_ingest(self, tmp_path, db, make_jpeg):
+        # Arrange
+        source = tmp_path / 'source'
+        data_root = tmp_path / 'data'
+        make_jpeg(source / 'IMG_001.jpg', size=(640, 480))
+
+        # Act
+        with patch('crittercam.pipeline.ingest.read_exif', return_value=_DUMMY_METADATA):
+            ingest(source, data_root, db)
+
+        # Assert — thumb_path recorded and file exists on disk
+        row = db.execute('SELECT thumb_path FROM images').fetchone()
+        assert row['thumb_path'] is not None
+        assert (data_root / row['thumb_path']).exists()
+
+    def test_thumbnail_max_dimension(self, tmp_path, db, make_jpeg):
+        # Arrange
+        source = tmp_path / 'source'
+        data_root = tmp_path / 'data'
+        make_jpeg(source / 'IMG_001.jpg', size=(1280, 960))
+
+        # Act
+        with patch('crittercam.pipeline.ingest.read_exif', return_value=_DUMMY_METADATA):
+            ingest(source, data_root, db)
+
+        # Assert — thumbnail longest side is at most 320px
+        thumb_path_str = db.execute('SELECT thumb_path FROM images').fetchone()['thumb_path']
+        thumb = Image.open(data_root / thumb_path_str)
+        assert max(thumb.size) <= 320
+
+
+class TestGenerateThumbnail:
+    """Test the _generate_thumbnail function."""
+
+    def test_writes_thumbnail_file(self, tmp_path, make_jpeg):
+        # Arrange
+        data_root = tmp_path / 'data'
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(640, 480))
+
+        # Act
+        result = _generate_thumbnail(image_abs, image_rel, data_root)
+
+        # Assert
+        assert result is not None
+        assert (data_root / result).exists()
+
+    def test_returns_path_relative_to_data_root(self, tmp_path, make_jpeg):
+        # Arrange
+        data_root = tmp_path / 'data'
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(64, 64))
+
+        # Act
+        result = _generate_thumbnail(image_abs, image_rel, data_root)
+
+        # Assert
+        assert not result.is_absolute()
+        assert result == Path('derived/2026/03/15/IMG_001_thumb.jpg')
+
+    def test_thumbnail_fits_within_max_size(self, tmp_path, make_jpeg):
+        # Arrange
+        data_root = tmp_path / 'data'
+        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_abs = data_root / image_rel
+        make_jpeg(image_abs, size=(1280, 960))
+
+        # Act
+        result = _generate_thumbnail(image_abs, image_rel, data_root)
+
+        # Assert
+        assert max(Image.open(data_root / result).size) <= 320
+
+    def test_returns_none_on_missing_file(self, tmp_path):
+        # Arrange
+        data_root = tmp_path / 'data'
+        image_rel = Path('images/2026/03/15/missing.jpg')
+        image_abs = data_root / image_rel  # does not exist
+
+        # Act
+        result = _generate_thumbnail(image_abs, image_rel, data_root)
+
+        # Assert
+        assert result is None
