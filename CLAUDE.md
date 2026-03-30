@@ -128,9 +128,8 @@ foo(
 ### Unit Tests
 - Use pytest framework
 - Test directory structure must mirror the source package structure exactly:
-  - `crittercam/pipeline/db.py` → `tests/pipeline/test_db.py`
-  - `crittercam/pipeline/exif.py` → `tests/pipeline/test_exif.py`
-  - `crittercam/cli.py` → `tests/test_cli.py`
+  strip the `crittercam/` prefix and prepend `tests/` — the rest of the path is identical.
+  `crittercam/a/b/c.py` → `tests/a/b/test_c.py`, at every level of nesting without exception.
   - Each subdirectory under `tests/` must have an `__init__.py`
 - Test file naming: `test_<module_name>.py`
 - Test function naming: `test_<scenario>`

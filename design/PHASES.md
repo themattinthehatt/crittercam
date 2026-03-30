@@ -23,6 +23,7 @@
 - [x] mtime fallback when EXIF timestamp is absent
 - [x] Destination collision detection (different hash, same filename + date → error, not silent overwrite)
 - [x] Idempotency verified — re-running on the same source produces no duplicates
+- [x] Thumbnail generation at ingest time (max 320px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`); path recorded in `images.thumb_path`
 
 ### Open questions
 - [ ] How to detect SD card mount reliably on this OS?
@@ -41,13 +42,13 @@
 - Batch worker reads pending detection jobs from `processing_jobs`
 - Runs classifier (SpeciesNet) via the swappable classifier interface
 - Writes detection rows to `detections` table; marks prior rows `is_active = 0` if re-running
-- Generates derived assets: full-image thumbnail, padded crop per detection
+- Generates detection crop (padded bbox) per detection
 - Derived asset paths stored relative to data_root
 - Marks `processing_jobs` row as done (or error)
 
 ### Resolved
 - Classifier: SpeciesNet (google/cameratrapai), run locally (Decisions 002, 016)
-- One detection row per image; top MegaDetector bbox used for crop (Decision 017)
+- One detection row per image; top SpeciesNet bbox used for crop (Decision 017)
 - Bounding boxes stored as (x, y, w, h) normalized — SpeciesNet's native format
 - Geofencing via country + admin1_region in config (country='USA', admin1_region='CT')
 - `is_active` flag distinguishes current model run from prior runs (Decision 012)
@@ -56,14 +57,13 @@
 
 ### Done
 - [x] `Classifier` Protocol + `Detection` dataclass (`classifier/base.py`)
-- [x] `SpeciesNetAdapter` wrapping detector + classifier + ensemble (`classifier/speciesnet.py`)
-- [x] `classify_pending()` — processes all pending jobs, writes detection rows, generates assets
-- [x] `crittercam classify` CLI subcommand with `--country`, `--admin1-region`, `--crop-padding` overrides
+- [x] `SpeciesNetAdapter` wrapping detector + classifier + ensemble (`classifier/speciesnet.py`); handles MPO/non-RGB images via PIL convert
+- [x] `classify_pending()` — processes all pending jobs, writes detection rows, generates crops
+- [x] `reset_errors()` / `reset_all()` — retry errored or all jobs
+- [x] `crittercam classify` CLI subcommand with `--country`, `--admin1-region`, `--crop-padding`, `--retry-errors`, `--reclassify-all` overrides
 - [x] `crittercam setup` updated to prompt for country and admin1_region
 - [x] Country validation against full ISO 3166-1 alpha-3 code list
-- [x] Thumbnail generation (max 640px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`)
-- [x] Detection crop generation with configurable padding (`derived/YYYY/MM/DD/<stem>_det001.jpg`)
-- [x] Thumbnail path recorded in `images.thumb_path`; crop path in `detections.crop_path`
+- [x] Detection crop generation with configurable padding (`derived/YYYY/MM/DD/<stem>_det001.jpg`); path recorded in `detections.crop_path`
 
 ### Completion criteria
 - [x] Pending detection jobs → species label + confidence score in `detections`

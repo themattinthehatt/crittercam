@@ -1,13 +1,12 @@
-"""Tests for crittercam.cli."""
+"""Tests for crittercam.cli.cmd_setup."""
 
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from crittercam.config import Config, load
-from crittercam.cli import cmd_setup
+from crittercam.cli.cmd_setup import cmd_setup
 
 
 class TestCmdSetup:
@@ -17,7 +16,7 @@ class TestCmdSetup:
         # Arrange
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act — provide data_root then skip country
@@ -35,7 +34,7 @@ class TestCmdSetup:
         # Arrange
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act
@@ -58,7 +57,7 @@ class TestCmdSetup:
         # Arrange
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act — provide data_root, country, admin1_region
@@ -74,7 +73,7 @@ class TestCmdSetup:
         # Arrange
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act — bad country first, then valid, then skip admin1
@@ -88,7 +87,7 @@ class TestCmdSetup:
         # Arrange — write an existing config
         config_path = tmp_path / 'config.toml'
         data_root = tmp_path / 'data'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
         with patch('builtins.input', side_effect=[str(data_root), '']):
             cmd_setup()
@@ -107,7 +106,7 @@ class TestCmdSetup:
         config_path = tmp_path / 'config.toml'
         data_root_old = tmp_path / 'old'
         data_root_new = tmp_path / 'new'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
         with patch('builtins.input', side_effect=[str(data_root_old), '']):
             cmd_setup()
@@ -122,7 +121,7 @@ class TestCmdSetup:
     def test_exits_on_empty_data_root(self, tmp_path, monkeypatch):
         # Arrange
         config_path = tmp_path / 'config.toml'
-        monkeypatch.setattr('crittercam.cli.CONFIG_PATH', config_path)
+        monkeypatch.setattr('crittercam.cli.cmd_setup.CONFIG_PATH', config_path)
         monkeypatch.setattr('crittercam.config.CONFIG_PATH', config_path)
 
         # Act / Assert — empty data root triggers sys.exit(1) before country prompt

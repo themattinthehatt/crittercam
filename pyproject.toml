@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-crittercam = "crittercam.cli:main"
+crittercam = "crittercam.cli.main:main"
 
 [project.optional-dependencies]
 dev = [

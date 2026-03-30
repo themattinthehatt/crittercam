@@ -46,11 +46,12 @@ The system has a clean physical boundary:
 - Batch job works through the queue of newly ingested images
 - AI classifier produces: species label, confidence score, bounding box
 - Classifier is a swappable component (see Decisions log)
-- Generates derived assets immediately after classification:
-  - Full-image thumbnail for each image
+- Generates detection crops immediately after classification:
   - Padded crop centred on each detected animal's bounding box
 - Derived assets written to `derived/YYYY/MM/DD/`, mirroring the image archive
 - Metadata writer commits all results to database in a single transaction
+
+> Note: full-image thumbnails are generated during Phase 1 ingestion, not Phase 2.
 
 ### Phase 3 — Storage
 - SQLite database holds all detection events and metadata
@@ -72,7 +73,7 @@ The system has a clean physical boundary:
 | Language | Python 3.12 | Decided |
 | Build system | setuptools | Decided |
 | Database | SQLite | Decided |
-| AI classifier | MegaDetector (swappable) | Decided |
+| AI classifier | SpeciesNet (swappable) | Decided |
 | CLI framework | argparse (stdlib) | Decided |
 | Config format | TOML (`tomli-w` for writing) | Decided |
 | Web framework | TBD | Phase 4 |
@@ -102,25 +103,34 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   └── DECISIONS.md
 ├── CLAUDE.md
 ├── crittercam/
-│   ├── cli.py                       # entry point: `crittercam` command
+│   ├── cli/                         # entry point: `crittercam` command
+│   │   ├── main.py                  # argument parser + dispatch
+│   │   ├── _geo.py                  # country/admin1 validation + prompts
+│   │   ├── cmd_setup.py             # `crittercam setup`
+│   │   ├── cmd_ingest.py            # `crittercam ingest`
+│   │   └── cmd_classify.py          # `crittercam classify`
 │   ├── config.py                    # config load/save (~/.config/crittercam/config.toml)
 │   ├── pipeline/
 │   │   ├── db.py                    # connection + migration runner
 │   │   ├── exif.py                  # EXIF extraction (Browning camera support)
-│   │   ├── ingest.py                # Phase 1 ingestion logic
-│   │   ├── classify.py              # Phase 2 classification + derived asset generation
+│   │   ├── ingest.py                # Phase 1 ingestion + thumbnail generation
+│   │   ├── classify.py              # Phase 2 classification + crop generation
 │   │   └── migrations/
 │   │       └── 0001_initial_schema.sql
 │   ├── classifier/
 │   │   ├── base.py                  # Detection dataclass + Classifier Protocol
 │   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
 │   └── web/                         # dashboard interface (Phase 4)
-├── tests/
-│   ├── test_cli.py
+├── tests/                           # mirrors crittercam/ structure exactly
 │   ├── test_config.py
-│   ├── classifier/                  # mirrors crittercam/classifier/
+│   ├── cli/
+│   │   ├── test_cmd_setup.py
+│   │   ├── test_cmd_ingest.py
+│   │   ├── test_cmd_classify.py
+│   │   └── test_geo.py
+│   ├── classifier/
 │   │   └── test_speciesnet.py
-│   └── pipeline/                    # mirrors crittercam/pipeline/
+│   └── pipeline/
 │       ├── assets/                  # sample images (e.g. BROWNING.JPG)
 │       ├── conftest.py
 │       ├── test_classify.py
