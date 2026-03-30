@@ -39,6 +39,7 @@ The system has a clean physical boundary:
 - Triggered manually when SD card is offloaded (approximately monthly)
 - Copies new files into organized raw store: `images/YYYY/MM/DD/`
 - Extracts EXIF metadata (timestamp, camera settings) at ingest time
+- Generates full-image thumbnails, written to `derived/YYYY/MM/DD/`, mirroring the image archive 
 - Idempotent: running ingestion twice on the same card does not duplicate images
 - Enqueues all new images for Phase 2 processing as a batch
 
@@ -48,10 +49,7 @@ The system has a clean physical boundary:
 - Classifier is a swappable component (see Decisions log)
 - Generates detection crops immediately after classification:
   - Padded crop centred on each detected animal's bounding box
-- Derived assets written to `derived/YYYY/MM/DD/`, mirroring the image archive
 - Metadata writer commits all results to database in a single transaction
-
-> Note: full-image thumbnails are generated during Phase 1 ingestion, not Phase 2.
 
 ### Phase 3 — Storage
 - SQLite database holds all detection events and metadata

@@ -8,13 +8,17 @@
 - Compute SHA-256 hash of each JPEG; skip if hash already exists in `images` table
 - Copy new files into `<data_root>/images/YYYY/MM/DD/`
 - Extract EXIF metadata (timestamp, filename, size) at ingest time
-- Insert row into `images` table
+- Generate a full-image thumbnail (max 320px) immediately after copying; write to `derived/YYYY/MM/DD/`
+- Insert row into `images` table, including `thumb_path`
 - Insert `processing_jobs` row (job_type='detection', status='pending') for each new image
 
 ### Resolved
 - Deduplication key: SHA-256 file hash (Decision 009)
 - Pipeline is batch-triggered (manual), not a continuous watcher (Decision 005)
 - Paths stored relative to data_root (Decision 010)
+
+### Open questions
+- [ ] How to detect SD card mount reliably on this OS?
 
 ### Done
 - [x] `crittercam setup` — prompts for data_root, writes config, initialises database
@@ -25,13 +29,11 @@
 - [x] Idempotency verified — re-running on the same source produces no duplicates
 - [x] Thumbnail generation at ingest time (max 320px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`); path recorded in `images.thumb_path`
 
-### Open questions
-- [ ] How to detect SD card mount reliably on this OS?
-
 ### Completion criteria
 - [x] Point CLI at source directory → images appear in `images/` tree, organized by date
 - [x] Re-running on the same source adds no duplicates
 - [x] Each new image produces a pending detection job in `processing_jobs`
+- [x] Each new image has a thumbnail in `derived/` and `thumb_path` recorded in DB
 
 ---
 
@@ -67,7 +69,7 @@
 
 ### Completion criteria
 - [x] Pending detection jobs → species label + confidence score in `detections`
-- [x] Thumbnails and crops written to `derived/` tree and referenced in DB
+- [x] Crops written to `derived/` tree and referenced in DB
 - [x] Re-running with a new model produces new rows; old rows marked inactive
 
 ---
@@ -80,25 +82,25 @@
 - Migration infrastructure
 - CSV / JSON export scripts
 
-### Done
-- [x] Schema designed and implemented (`0001_initial_schema.sql`)
-- [x] Migration runner (`pipeline/db.py`) — applies pending migrations in order, idempotent
-- [x] `crittercam setup` runs migrations on first run and on re-run
-
 ### Resolved
 - Schema designed: see DESIGN.md for full DDL
 - Paths stored relative to data_root; database lives on external drive with images (Decision 010)
 - No BLOBs; derived assets on disk, referenced by path (Decision 006)
 - Migration tool: hand-rolled versioned SQL scripts (Decision 015)
 
+### Done
+- [x] Schema designed and implemented (`0001_initial_schema.sql`)
+- [x] Migration runner (`pipeline/db.py`) — applies pending migrations in order, idempotent
+- [x] `crittercam setup` runs migrations on first run and on re-run
+
 ### Remaining
 - [ ] CSV / JSON export scripts
 
 ### Completion criteria
-- Schema created from scratch by a single command ✓
-- Migrations apply cleanly to an existing database ✓
-- All detections queryable by species, date, confidence
-- Full dataset exportable to CSV in one command
+- [x] Schema created from scratch by a single command
+- [x] Migrations apply cleanly to an existing database
+- [ ] All detections queryable by species, date, confidence
+- [ ] Full dataset exportable to CSV in one command
 
 ---
 
@@ -117,6 +119,27 @@
 - [ ] Should corrections trigger re-processing or just update the label?
 
 ### Completion criteria
-- Browse all detections with thumbnail + metadata
-- Correct a wrong label in under 3 clicks
-- Corrections are clearly distinguished from AI-generated labels in the DB
+- [ ] Browse all detections with thumbnail + metadata
+- [ ] Correct a wrong label in under 3 clicks
+- [ ] Corrections are clearly distinguished from AI-generated labels in the DB
+
+---
+
+## Phase 5 — Individual re-identification
+**Status**: Not started
+
+### Scope
+- Given detections of the same species, identify whether they depict the same individual
+- Build and maintain per-individual identity records linked to detection rows
+- Support manual confirmation and correction of identity assignments
+
+### Open questions
+- [ ] Which re-ID approach? (embedding similarity, dedicated re-ID model, manual clustering)
+- [ ] What species to target first? (deer and coyote are likely highest-volume)
+- [ ] How to represent identity in the DB — new `individuals` table, or field on `detections`?
+- [ ] Confidence threshold for automatic assignment vs. flagging for human review
+
+### Completion criteria
+- [ ] Detections of the same individual are linked across sessions
+- [ ] Identity assignments are queryable and correctable via the interface
+- [ ] Per-individual activity history is browsable
