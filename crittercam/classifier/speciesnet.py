@@ -65,8 +65,23 @@ class SpeciesNetAdapter:
 
         # each component has its own preprocess() that returns a PreprocessedImage
         detection_result = self._detector.predict(filepath, self._detector.preprocess(pil_img))
+
+        # pass detector bbox to classifier so it crops to the animal before classifying
+        raw_detections = detection_result.get('detections', [])
+        clf_bboxes = None
+        if raw_detections:
+            from speciesnet.utils import BBox
+            raw_bbox = raw_detections[0].get('bbox')
+            if raw_bbox and len(raw_bbox) == 4:
+                clf_bboxes = [BBox(
+                    xmin=raw_bbox[0],
+                    ymin=raw_bbox[1],
+                    width=raw_bbox[2],
+                    height=raw_bbox[3],
+                )]
+
         classification_result = self._classifier_model.predict(
-            filepath, self._classifier_model.preprocess(pil_img),
+            filepath, self._classifier_model.preprocess(pil_img, bboxes=clf_bboxes),
         )
 
         geolocation_result: dict[str, str] = {}
@@ -75,38 +90,43 @@ class SpeciesNetAdapter:
         if self._admin1_region:
             geolocation_result['admin1_region'] = self._admin1_region
 
-        results = self._ensemble.combine(
-            filepaths=[filepath],
-            classifier_results={filepath: classification_result},
-            detector_results={filepath: detection_result},
-            geolocation_results={filepath: geolocation_result},
-            partial_predictions={},
-        )
+        # --- classifier-only mode (ensemble disabled for testing) ---
+        # results = self._ensemble.combine(
+        #     filepaths=[filepath],
+        #     classifier_results={filepath: classification_result},
+        #     detector_results={filepath: detection_result},
+        #     geolocation_results={filepath: geolocation_result},
+        #     partial_predictions={},
+        # )
+        # result = results[0]
+        # failures = result.get('failures', [])
+        # if failures:
+        #     raise RuntimeError(f'SpeciesNet reported failures: {failures}')
+        # label = result.get('prediction', '')
+        # if not label:
+        #     return []
+        # label = str(label).lower()
+        # confidence = float(result.get('prediction_score', 0.0))
+        # prediction_source = result.get('prediction_source', 'unknown')
+        # logger.info('prediction_source=%s label=%s confidence=%.3f', prediction_source, label, confidence)
+        # bbox from ensemble result:
+        # raw_detections = result.get('detections', [])
 
-        result = results[0]
-
-        failures = result.get('failures', [])
+        failures = classification_result.get('failures', [])
         if failures:
             raise RuntimeError(f'SpeciesNet reported failures: {failures}')
 
-        label = result.get('prediction', '')
-        if not label:
+        classifications = classification_result.get('classifications', {})
+        classes = classifications.get('classes', [])
+        scores = classifications.get('scores', [])
+        if not classes:
             return []
 
-        label = str(label).lower()
-        confidence = float(result.get('prediction_score', 0.0))
-
+        label = str(classes[0]).lower()
+        confidence = float(scores[0])
         bbox = None
-        if label != 'blank':
-            raw_detections = result.get('detections', [])
-            if raw_detections:
-                raw_bbox = raw_detections[0].get('bbox')
-                if raw_bbox and len(raw_bbox) == 4:
-                    bbox = (
-                        float(raw_bbox[0]),
-                        float(raw_bbox[1]),
-                        float(raw_bbox[2]),
-                        float(raw_bbox[3]),
-                    )
+        if label != 'blank' and clf_bboxes:
+            b = clf_bboxes[0]
+            bbox = (b.xmin, b.ymin, b.width, b.height)
 
         return [Detection(label=label, confidence=confidence, bbox=bbox)]

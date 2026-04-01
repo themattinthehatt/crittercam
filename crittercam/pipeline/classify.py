@@ -165,7 +165,9 @@ def classify_pending(
 
         summary.classified += 1
         label = detections[0].label if detections else 'no prediction'
-        logger.info('classified %s: %s', filename, label)
+        label_final = label.split(';')[-1]
+        confidence = detections[0].confidence if detections else 'null'
+        logger.info(f'classified {filename}: {label_final} (confidence={confidence:1.2f})')
 
     return summary
 
