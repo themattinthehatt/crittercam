@@ -119,7 +119,7 @@ def classify_pending(
             )
         except Exception as exc:
             msg = str(exc)
-            logger.error('classify failed on %s: %s', filename, msg)
+            logger.error(f'classify failed on {filename}: {msg}')
             _mark_job(conn, job_id, 'error', completed_at=_now(), error_msg=msg)
             conn.commit()
             summary.errors[filename] = msg
@@ -164,10 +164,11 @@ def classify_pending(
         conn.commit()
 
         summary.classified += 1
-        label = detections[0].label if detections else 'no prediction'
-        label_final = label.split(';')[-1]
-        confidence = detections[0].confidence if detections else 'null'
-        logger.info(f'classified {filename}: {label_final} (confidence={confidence:1.2f})')
+        if detections:
+            label_final = detections[0].label.split(';')[-1]
+            logger.info(f'classified {filename}: {label_final} (confidence={detections[0].confidence:.2f})')
+        else:
+            logger.info(f'classified {filename}: no prediction')
 
     return summary
 

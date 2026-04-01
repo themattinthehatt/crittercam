@@ -51,7 +51,7 @@ def migrate(conn: sqlite3.Connection) -> None:
 
     for path in pending:
         version = _version(path)
-        logger.info('applying migration %04d: %s', version, path.name)
+        logger.info(f'applying migration {version:04d}: {path.name}')
         sql = path.read_text()
         conn.executescript(sql)
         conn.execute(
@@ -59,7 +59,7 @@ def migrate(conn: sqlite3.Connection) -> None:
             (version,),
         )
         conn.commit()
-        logger.info('migration %04d applied', version)
+        logger.info(f'migration {version:04d} applied')
 
 
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:

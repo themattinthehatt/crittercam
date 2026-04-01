@@ -1,6 +1,8 @@
 ![](assets/cirttercam_banner.jpg)
 
-Backyard wildlife camera trap pipeline — ingestion, species identification, and local dashboard.
+Backyard wildlife camera trap pipeline for ingestion, species identification, and local dashboard.
+
+This is a fun DIY project - for serious camera trap software, see [AddaxAI](https://addaxdatascience.com/addaxai/).
 
 ## Setup
 

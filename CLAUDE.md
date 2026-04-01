@@ -50,6 +50,7 @@ foo(
 
 ### Misc
 - Use `pathlib.Path` instead of `os` for path handling
+- Use f-strings for all string interpolation, including `logger` calls and `print` statements — never `%s` formatting or `.format()`
 
 ## Pipeline Conventions
 

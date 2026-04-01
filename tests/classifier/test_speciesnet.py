@@ -14,20 +14,22 @@ _MOCK_PIL_IMAGE = MagicMock(name='pil_image')
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_ensemble_result(
-    prediction='coyote',
-    prediction_score=0.91,
-    detections=None,
-    failures=None,
-):
-    """Build a minimal SpeciesNet ensemble output dict."""
+def _make_classifier_result(classes=None, scores=None, failures=None):
+    """Build a minimal SpeciesNetClassifier output dict."""
+    if failures:
+        return {'filepath': '/img.jpg', 'failures': failures}
     return {
         'filepath': '/img.jpg',
-        'prediction': prediction,
-        'prediction_score': prediction_score,
-        'detections': detections if detections is not None else [],
-        'failures': failures if failures is not None else [],
+        'classifications': {
+            'classes': classes if classes is not None else [],
+            'scores': scores if scores is not None else [],
+        },
     }
+
+
+def _make_detector_result(detections=None):
+    """Build a minimal SpeciesNetDetector output dict."""
+    return {'filepath': '/img.jpg', 'detections': detections if detections is not None else []}
 
 
 # ---------------------------------------------------------------------------
@@ -38,22 +40,29 @@ def _make_ensemble_result(
 def mock_speciesnet():
     """Inject fake speciesnet stub modules so no package install is needed.
 
-    Yields a dict of pre-configured mock instances (detector, classifier, ensemble)
+    Yields a dict of pre-configured mock instances (detector, classifier)
     whose return values can be overridden per test.
     """
     mock_detector_inst = MagicMock()
-    mock_detector_inst.predict.return_value = {'detections': []}
+    mock_detector_inst.predict.return_value = _make_detector_result()
 
     mock_classifier_inst = MagicMock()
-    mock_classifier_inst.predict.return_value = {'classifications': {}}
+    mock_classifier_inst.predict.return_value = _make_classifier_result()
 
-    mock_ensemble_inst = MagicMock()
+    # minimal BBox stand-in used by the lazy import inside classify()
+    class _BBox:
+        def __init__(self, xmin, ymin, width, height):
+            self.xmin = xmin
+            self.ymin = ymin
+            self.width = width
+            self.height = height
 
     stub_modules = {
         'speciesnet': MagicMock(),
         'speciesnet.detector': MagicMock(SpeciesNetDetector=MagicMock(return_value=mock_detector_inst)),
         'speciesnet.classifier': MagicMock(SpeciesNetClassifier=MagicMock(return_value=mock_classifier_inst)),
-        'speciesnet.ensemble': MagicMock(SpeciesNetEnsemble=MagicMock(return_value=mock_ensemble_inst)),
+        'speciesnet.ensemble': MagicMock(),
+        'speciesnet.utils': MagicMock(BBox=_BBox),
     }
 
     mock_pil_module = MagicMock()
@@ -64,7 +73,6 @@ def mock_speciesnet():
         yield {
             'detector': mock_detector_inst,
             'classifier': mock_classifier_inst,
-            'ensemble': mock_ensemble_inst,
         }
 
 
@@ -78,13 +86,9 @@ class TestSpeciesNetAdapterClassify:
     def test_returns_detection_for_animal(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(
-                prediction='coyote',
-                prediction_score=0.91,
-                detections=[{'bbox': [0.1, 0.2, 0.3, 0.4], 'conf': 0.91, 'category': '1'}],
-            )
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['coyote', 'canid', 'animal'], scores=[0.91, 0.06, 0.02],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act
@@ -98,12 +102,12 @@ class TestSpeciesNetAdapterClassify:
     def test_bbox_stored_as_xywh(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(
-                prediction='deer',
-                detections=[{'bbox': [0.1, 0.2, 0.3, 0.4], 'conf': 0.8, 'category': '1'}],
-            )
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['deer'], scores=[0.8],
+        )
+        mock_speciesnet['detector'].predict.return_value = _make_detector_result(
+            detections=[{'bbox': [0.1, 0.2, 0.3, 0.4], 'conf': 0.8, 'category': '1'}],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act
@@ -115,24 +119,27 @@ class TestSpeciesNetAdapterClassify:
     def test_blank_returns_detection_with_no_bbox(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(prediction='blank', prediction_score=0.99)
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['blank'], scores=[0.99],
+        )
+        mock_speciesnet['detector'].predict.return_value = _make_detector_result(
+            detections=[{'bbox': [0.1, 0.2, 0.3, 0.4], 'conf': 0.9, 'category': '1'}],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act
         result = adapter.classify(Path('/img.jpg'))
 
-        # Assert
+        # Assert — blank label suppresses bbox even when detector found something
         assert result[0].label == 'blank'
         assert result[0].bbox is None
 
     def test_label_normalized_to_lowercase(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(prediction='ANIMAL', prediction_score=0.7)
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['ANIMAL'], scores=[0.7],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act
@@ -144,21 +151,21 @@ class TestSpeciesNetAdapterClassify:
     def test_raises_on_component_failures(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(failures=['DETECTOR'])
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            failures=['CLASSIFIER'],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act / Assert
         with pytest.raises(RuntimeError, match='failures'):
             adapter.classify(Path('/img.jpg'))
 
-    def test_returns_empty_list_when_no_prediction(self, mock_speciesnet):
+    def test_returns_empty_list_when_no_classes(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(prediction='')
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=[], scores=[],
+        )
         adapter = SpeciesNetAdapter()
 
         # Act
@@ -170,9 +177,10 @@ class TestSpeciesNetAdapterClassify:
     def test_no_bbox_when_detections_list_empty(self, mock_speciesnet):
         # Arrange
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result(prediction='raccoon', detections=[])
-        ]
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['raccoon'], scores=[0.85],
+        )
+        mock_speciesnet['detector'].predict.return_value = _make_detector_result(detections=[])
         adapter = SpeciesNetAdapter()
 
         # Act
@@ -181,19 +189,22 @@ class TestSpeciesNetAdapterClassify:
         # Assert
         assert result[0].bbox is None
 
-    def test_geolocation_passed_to_ensemble(self, mock_speciesnet):
-        # Arrange
+    def test_classifier_receives_bbox_from_detector(self, mock_speciesnet):
+        # Arrange — verify detector bbox is forwarded to classifier preprocess
         from crittercam.classifier.speciesnet import SpeciesNetAdapter
-        mock_speciesnet['ensemble'].combine.return_value = [
-            _make_ensemble_result()
-        ]
-        adapter = SpeciesNetAdapter(country='USA', admin1_region='CT')
+        mock_speciesnet['classifier'].predict.return_value = _make_classifier_result(
+            classes=['squirrel'], scores=[0.88],
+        )
+        mock_speciesnet['detector'].predict.return_value = _make_detector_result(
+            detections=[{'bbox': [0.1, 0.2, 0.3, 0.4], 'conf': 0.9, 'category': '1'}],
+        )
+        adapter = SpeciesNetAdapter()
 
         # Act
         adapter.classify(Path('/img.jpg'))
 
-        # Assert — geolocation dict forwarded to ensemble.combine
-        call_kwargs = mock_speciesnet['ensemble'].combine.call_args.kwargs
-        geo = call_kwargs['geolocation_results']['/img.jpg']
-        assert geo['country'] == 'USA'
-        assert geo['admin1_region'] == 'CT'
+        # Assert — classifier preprocess called with a non-None bboxes list
+        preprocess_call = mock_speciesnet['classifier'].preprocess.call_args
+        bboxes = preprocess_call.kwargs.get('bboxes') or preprocess_call.args[1]
+        assert bboxes is not None
+        assert len(bboxes) == 1

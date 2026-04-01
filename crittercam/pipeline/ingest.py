@@ -56,7 +56,7 @@ def ingest(
     jpegs = _find_jpegs(source_dir)
 
     if not jpegs:
-        logger.info('no JPEG files found in %s', source_dir)
+        logger.info(f'no JPEG files found in {source_dir}')
         return summary
 
     existing_hashes = _load_existing_hashes(conn)
@@ -67,12 +67,12 @@ def ingest(
         try:
             file_hash = _hash_file(path)
         except OSError as exc:
-            logger.error('could not read %s: %s', path, exc)
+            logger.error(f'could not read {path}: {exc}')
             summary.errors[path.name] = str(exc)
             continue
 
         if file_hash in existing_hashes:
-            logger.debug('skipping %s (already ingested)', path.name)
+            logger.debug(f'skipping {path.name} (already ingested)')
             summary.skipped += 1
             continue
 
@@ -83,13 +83,13 @@ def ingest(
 
         if dest_abs.exists():
             msg = f'destination already exists: {dest_rel}'
-            logger.error('%s — skipping %s', msg, path.name)
+            logger.error(f'{msg} — skipping {path.name}')
             summary.errors[path.name] = msg
             continue
 
         dest_abs.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dest_abs)
-        logger.info('copied %s → %s', path.name, dest_rel)
+        logger.info(f'copied {path.name} → {dest_rel}')
 
         thumb_rel = _generate_thumbnail(dest_abs, dest_rel, data_root)
 
@@ -147,12 +147,7 @@ def ingest(
         conn.execute('PRAGMA synchronous = FULL')
         conn.execute('PRAGMA journal_mode = WAL')
 
-    logger.info(
-        'ingestion complete: %d ingested, %d skipped, %d errors',
-        summary.ingested,
-        summary.skipped,
-        len(summary.errors),
-    )
+    logger.info(f'ingestion complete: {summary.ingested} ingested, {summary.skipped} skipped, {len(summary.errors)} errors')
     return summary
 
 
@@ -224,7 +219,7 @@ def _generate_thumbnail(image_abs: Path, image_rel: Path, data_root: Path) -> Pa
         img.save(thumb_abs, format='JPEG', quality=85)
         return thumb_abs.relative_to(data_root)
     except Exception as exc:
-        logger.warning('thumbnail generation failed for %s: %s', image_abs.name, exc)
+        logger.warning(f'thumbnail generation failed for {image_abs.name}: {exc}')
         return None
 
 
@@ -242,5 +237,5 @@ def _capture_date(metadata, path: Path) -> datetime:
     """
     if metadata.captured_at:
         return metadata.captured_at
-    logger.warning('no EXIF timestamp for %s, falling back to file mtime', path.name)
+    logger.warning(f'no EXIF timestamp for {path.name}, falling back to file mtime')
     return datetime.fromtimestamp(path.stat().st_mtime)

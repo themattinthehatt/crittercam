@@ -38,7 +38,7 @@ class SpeciesNetAdapter:
         self._country = country
         self._admin1_region = admin1_region
         self._model_name = model_name
-        logger.info('loading SpeciesNet model: %s', model_name)
+        logger.info(f'loading SpeciesNet model: {model_name}')
         self._detector = SpeciesNetDetector(model_name)
         self._classifier_model = SpeciesNetClassifier(model_name)
         self._ensemble = SpeciesNetEnsemble(model_name, geofence=bool(country))

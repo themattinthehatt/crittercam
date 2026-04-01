@@ -63,7 +63,7 @@ def read_exif(image_path: Path) -> ImageMetadata:
         with Image.open(image_path) as img:
             raw = img._getexif() or {}
     except Exception:
-        logger.warning('could not read EXIF from %s', image_path)
+        logger.warning(f'could not read EXIF from {image_path}')
         return ImageMetadata(
             captured_at=None,
             width=None,
@@ -97,7 +97,7 @@ def _parse_datetime(value: str | None) -> datetime | None:
     try:
         return datetime.strptime(value, _EXIF_DATETIME_FORMAT)
     except ValueError:
-        logger.warning('unparseable EXIF datetime: %r', value)
+        logger.warning(f'unparseable EXIF datetime: {value!r}')
         return None
 
 
