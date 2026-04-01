@@ -400,14 +400,12 @@ running fully locally
 **Rationale**: SpeciesNet is the strongest fit for a fixed backyard deployment:
 - Trained on 65M+ camera trap images (not observer photos), so the image
   distribution matches closely
-- Geofencing support — passing country/state filters implausible predictions
-  at the ensemble step; valuable for a single fixed location
 - Taxonomic rollup — falls back to genus/family rather than guessing wrong at
   species level; correct behavior for a dataset that needs to be trusted over time
 - Blank detection — handles wind-triggered empty frames explicitly, which camera
   traps produce in volume
-- Returns bounding boxes (via MegaDetector) feeding directly into crop
-  generation (Decision 007) without additional wiring
+- Returns bounding boxes (via the internal MegaDetector component) feeding
+  directly into crop generation (Decision 007) without additional wiring
 - Fully local, no API cost, no data leaves the machine (consistent with
   Decision 004)
 
@@ -418,6 +416,8 @@ running fully locally
   throughput
 - The classifier interface (Decision 002) wraps SpeciesNet so it can be swapped
   later without touching the pipeline
+- Geofencing (country/state filtering) was a feature of the ensemble step and is
+  currently inactive; see Decision 018
 
 ---
 
@@ -425,43 +425,90 @@ running fully locally
 
 **Date**: 2026-03-29
 **Decision**: Each processed image produces at most one detection row in the
-`detections` table. The species label and confidence come from SpeciesNet's
-single ensemble `prediction` / `prediction_score`. The bounding box columns
-(`bbox_x1`, `bbox_y1`, `bbox_x2`, `bbox_y2`) are populated from the
-highest-confidence MegaDetector detection in the `detections` array. Images
-where SpeciesNet returns `"blank"` or no detections produce a detection row
-with the appropriate label and null bbox columns.
+`detections` table. The species label and confidence come from the top entry in
+`SpeciesNetClassifier`'s `classifications.classes` / `classifications.scores`
+arrays (see Decision 018 for why the ensemble is bypassed). The bounding box
+columns (`bbox_x`, `bbox_y`, `bbox_w`, `bbox_h`) are populated from the
+highest-confidence detection returned by `SpeciesNetDetector`. Images where the
+classifier returns `"blank"` or no classes produce a detection row with the
+appropriate label and null bbox columns.
 
 **Considered**:
-- One row per MegaDetector bounding box — SpeciesNet returns multiple boxes
-  when multiple animals are in frame, but only one ensemble `prediction` per
-  image (not per box). This would produce multiple rows all sharing the same
-  species label, which is redundant and misleading.
-- One row per image using the top bbox (chosen) — matches SpeciesNet's actual
+- One row per detector bounding box — the detector may return multiple boxes
+  when multiple animals are in frame, but the classifier produces one label per
+  image (not per box). Multiple rows sharing the same species label would be
+  redundant and misleading.
+- One row per image using the top bbox (chosen) — matches the classifier's actual
   output granularity. The top detection box is used for crop generation
   (Decision 007); using the same box for the detection row is consistent.
-- Storing raw top-5 classifications JSON as an additional column — deferred.
-  The structured `prediction` and `confidence` fields cover all current query
-  needs. If top-5 data becomes useful later, a column can be added via migration.
+- Storing raw top-5 classifications as an additional column — deferred.
+  The structured label and confidence fields cover all current query needs.
+  If top-5 data becomes useful later, a column can be added via migration.
 
-**Rationale**: SpeciesNet's ensemble produces one label per image, not one label
-per animal. Designing the schema around that actual contract avoids fabricating
-a per-box species breakdown the model does not provide. The top-bbox choice is
+**Rationale**: The classifier produces one label per image, not one label per
+animal. Designing the schema around that actual contract avoids fabricating a
+per-box species breakdown the model does not provide. The top-bbox choice is
 consistent with crop generation (Decision 007), which also operates on the
 single highest-confidence detection.
 
 **SpeciesNet fields → detection row mapping**:
-- `prediction`         → `label` (normalized to lowercase)
-- `prediction_score`   → `confidence`
-- `prediction_source`  → not stored (may add later if debugging value is clear)
-- `detections[0].bbox` → `bbox_x/y/w/h` (top detection by `conf`; null if absent)
-- `model_version`      → `model_version`
+- `classifications.classes[0]` → `label` (normalized to lowercase)
+- `classifications.scores[0]`  → `confidence`
+- `detections[0].bbox`         → `bbox_x/y/w/h` (top detection; null if absent
+                                   or label is `"blank"`)
+- `model_version`              → `model_version`
 - Bbox format: SpeciesNet returns `[xmin, ymin, width, height]` normalized 0–1;
   stored as-is in `bbox_x/y/w/h` — no conversion required
 
 **Blank and empty frame handling**:
-- `prediction == "blank"` → detection row with `label='blank'`, null bbox, null crop_path
+- `classes[0] == "blank"` → detection row with `label='blank'`, null bbox, null crop_path
 - Classifier failure → log error in processing_jobs, no detection row inserted
+
+---
+
+## 018 — SpeciesNet ensemble disabled; classifier-only mode with bbox-guided preprocessing
+
+**Date**: 2026-03-29
+**Decision**: The `SpeciesNetEnsemble` step is bypassed. The pipeline runs
+`SpeciesNetDetector` and `SpeciesNetClassifier` directly and reads the top
+classification from `classifications.classes[0]` / `scores[0]`.
+
+**Considered**:
+- Full ensemble (original design) — combines detector, classifier, and geolocation
+  into a single `prediction` field via `SpeciesNetEnsemble.combine()`
+- Classifier-only (chosen) — call classifier directly; read top-1 class from its
+  output; use detector bbox only to guide the classifier crop
+
+**Rationale**: In initial field runs, the ensemble's `prediction_source` was
+almost always `"detector"` for backyard camera trap images. The detector produces
+coarse labels (`animal`, `bird`) rather than species-level ones. The ensemble
+promotes the detector's answer when the classifier is uncertain — which is the
+common case for small subjects in wide frames (squirrels, songbirds). Bypassing
+the ensemble and reading directly from the classifier returns the actual top-1
+species prediction, including taxonomic rollups when confidence is low.
+
+**How classifier-only mode works**:
+1. `SpeciesNetDetector.predict()` runs on the full image to get bounding boxes
+2. The top detector bbox (if any) is wrapped in a `BBox` object and passed to
+   `SpeciesNetClassifier.preprocess(pil_img, bboxes=[bbox])`
+3. The model variant in use (`v4.0.2a`) is type `always_crop` — without a bbox
+   the classifier falls back to a centre crop, which degrades accuracy; passing
+   the detector bbox ensures the classifier sees the animal, not background
+4. `SpeciesNetClassifier.predict()` returns `classifications.classes` /
+   `classifications.scores`; the pipeline reads `classes[0]` and `scores[0]`
+5. Bbox for the detection row and crop comes from the detector result, not the
+   classifier; it is suppressed when the label is `"blank"`
+
+**Current status**: experimental. The ensemble is commented out in
+`crittercam/classifier/speciesnet.py`, not deleted. If ensemble results prove
+better after further testing, re-enabling is straightforward.
+
+**Implications**:
+- `prediction_source` is no longer available (was an ensemble field); not stored
+- Geofencing (`country`, `admin1_region`) was applied at the ensemble step and is
+  currently inactive even if configured; the country/region args are accepted by
+  `SpeciesNetAdapter.__init__` for future re-enablement
+- Decision 017's field mapping is updated accordingly
 
 ---
 
