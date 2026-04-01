@@ -39,7 +39,7 @@ The system has a clean physical boundary:
 - Triggered manually when SD card is offloaded (approximately monthly)
 - Copies new files into organized raw store: `images/YYYY/MM/DD/`
 - Extracts EXIF metadata (timestamp, camera settings) at ingest time
-- Generates full-image thumbnails, written to `derived/YYYY/MM/DD/`, mirroring the image archive 
+- Generates full-image thumbnails, written to `derived/YYYY/MM/DD/`, mirroring the image archive
 - Idempotent: running ingestion twice on the same card does not duplicate images
 - Enqueues all new images for Phase 2 processing as a batch
 
@@ -59,10 +59,13 @@ The system has a clean physical boundary:
 - Export available at any time: CSV, JSON
 
 ### Phase 4 — Interface
-- Lightweight local web dashboard
-- Browse detections using derived asset thumbnails and crops
-- Filter by species / date / confidence
-- Human label correction feeds back into Phase 2 (re-queue or direct override)
+- Local web dashboard served by FastAPI + Uvicorn (Python) with a React (Vite) frontend
+- Three-tab layout: Home (summary statistics), Browse (filterable detection grid),
+  Analytics (charts and visualizations)
+- Phase 4a (first pass) is read-only; label correction is deferred to Phase 4b
+- In development: Vite dev server and Uvicorn run as separate processes via `Procfile.dev`
+- In production: React app is compiled once by `crittercam build-ui`; `crittercam serve`
+  starts a single Uvicorn process that serves both the API and the built static files
 
 ## Technology Choices
 
@@ -74,7 +77,9 @@ The system has a clean physical boundary:
 | AI classifier | SpeciesNet (swappable) | Decided |
 | CLI framework | argparse (stdlib) | Decided |
 | Config format | TOML (`tomli-w` for writing) | Decided |
-| Web framework | TBD | Phase 4 |
+| API framework | FastAPI + Uvicorn | Decided |
+| Frontend framework | React + Vite | Decided |
+| Chart library | Recharts | Decided |
 
 ## Storage Layout
 
@@ -100,13 +105,15 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   ├── PHASES.md
 │   └── DECISIONS.md
 ├── CLAUDE.md
+├── Procfile.dev                     # runs Uvicorn + Vite simultaneously in dev
 ├── crittercam/
 │   ├── cli/                         # entry point: `crittercam` command
 │   │   ├── main.py                  # argument parser + dispatch
 │   │   ├── _geo.py                  # country/admin1 validation + prompts
 │   │   ├── cmd_setup.py             # `crittercam setup`
 │   │   ├── cmd_ingest.py            # `crittercam ingest`
-│   │   └── cmd_classify.py          # `crittercam classify`
+│   │   ├── cmd_classify.py          # `crittercam classify`
+│   │   └── cmd_serve.py             # `crittercam serve` and `crittercam build-ui`
 │   ├── config.py                    # config load/save (~/.config/crittercam/config.toml)
 │   ├── pipeline/
 │   │   ├── db.py                    # connection + migration runner
@@ -118,14 +125,26 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   ├── classifier/
 │   │   ├── base.py                  # Detection dataclass + Classifier Protocol
 │   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
-│   └── web/                         # dashboard interface (Phase 4)
+│   └── web/                         # Phase 4 dashboard
+│       ├── api/                     # FastAPI route modules
+│       │   ├── detections.py        # GET /api/detections — filterable list
+│       │   ├── images.py            # GET /api/images/:id — full image metadata
+│       │   └── stats.py             # GET /api/stats/* — analytics endpoints
+│       ├── ui/                      # React app (Vite)
+│       │   ├── src/
+│       │   │   └── components/
+│       │   ├── index.html
+│       │   ├── package.json
+│       │   └── vite.config.js       # proxies /api/* to localhost:8000 in dev
+│       └── server.py                # FastAPI app + StaticFiles mount + uvicorn entry
 ├── tests/                           # mirrors crittercam/ structure exactly
 │   ├── test_config.py
 │   ├── cli/
 │   │   ├── test_cmd_setup.py
 │   │   ├── test_cmd_ingest.py
 │   │   ├── test_cmd_classify.py
-│   │   └── test_geo.py
+│   │   ├── test_geo.py
+│   │   └── test_cmd_serve.py
 │   ├── classifier/
 │   │   └── test_speciesnet.py
 │   └── pipeline/

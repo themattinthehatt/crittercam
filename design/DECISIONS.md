@@ -512,4 +512,91 @@ better after further testing, re-enabling is straightforward.
 
 ---
 
+## 019 — FastAPI + React (Vite) for the Phase 4 dashboard
+
+**Date**: 2026-03-31
+**Decision**: The Phase 4 web dashboard uses FastAPI + Uvicorn as the Python backend
+and React (via Vite) as the frontend. Recharts is the standard chart library.
+
+**Considered**:
+- Flask + HTMX — stays Python-only, no JS framework to learn; but HTMX is less
+  well-represented in Claude Code's training data, and complex UI state (dual-panel
+  image view, filterable grid) gets awkward to express in HTMX's fragment-swap model
+- Flask + React — Flask is a reasonable backend; FastAPI preferred because its
+  auto-generated `/docs` endpoint lets the owner query the API interactively from
+  a notebook, which suits a data-oriented workflow
+- FastAPI + Angular — Angular is used in lightning-pose-app (a familiar reference),
+  but Angular's full framework machinery (dependency injection, decorators, modules)
+  is heavier than needed at crittercam's scope and has a steeper learning curve
+- FastAPI + React (chosen) — React is the most widely used frontend library in
+  data-adjacent tooling; both React and FastAPI are heavily represented in Claude
+  Code's training data, making generated code more reliable and reviewable
+
+**Rationale**: At crittercam's scope (three views, two filters, a handful of chart
+types), React's "assembly required" nature is not a burden — `useState` and `fetch()`
+cover most UI needs, and Recharts covers all planned visualizations. The combination
+is conventional enough that Claude Code produces reliable, reviewable code, and the
+FastAPI `/docs` page is a genuine bonus for a data-oriented owner.
+
+**Implications**:
+- Node.js is a development dependency — required to build the UI, not to run it
+- Recharts is the default chart library; any JS visualization library (Plotly, D3)
+  can be dropped into a React component if more complex visualizations are needed
+- The FastAPI API is independently queryable at `http://localhost:8000/docs`
+- `fastapi`, `uvicorn`, and `python-multipart` are added to project dependencies
+
+---
+
+## 020 — React app lives inside the Python package; single server in production
+
+**Date**: 2026-03-31
+**Decision**: The React source lives at `crittercam/web/ui/`. The FastAPI server
+mounts the built output (`dist/`) as static files via Starlette's `StaticFiles`.
+In development, Vite and Uvicorn run as separate processes via `Procfile.dev`. In
+production, `crittercam build-ui` compiles the React app once and `crittercam serve`
+starts a single Uvicorn process serving both the API and the static files.
+
+**Considered**:
+- React app as a peer directory at repo root — cleaner separation in principle, but
+  puts `package.json` and `node_modules/` alongside `pyproject.toml` at the repo
+  root, implying false equality between the two pieces
+- Two servers always, no production consolidation — simpler to reason about but
+  requires two running processes for day-to-day use, which conflicts with the
+  project's local-first, minimal-process philosophy
+- React app inside the Python package, single production server (chosen) — the UI
+  is a component of the crittercam system, not a peer project; single-server
+  production use matches the project's philosophy
+
+**Rationale**: Keeping the React source inside `crittercam/web/ui/` makes clear
+that the UI is part of the system. The `dist/` output is gitignored. The two-server
+development setup (borrowed from lightning-pose-app's `Procfile.dev` pattern) gives
+fast UI iteration via Vite's hot module replacement without complicating day-to-day
+use.
+
+**Directory structure**:
+```
+crittercam/web/
+    api/
+        detections.py   # GET /api/detections — filterable detection list
+        images.py       # GET /api/images/:id — full image + bbox metadata
+        stats.py        # GET /api/stats/* — analytics endpoints
+    ui/
+        src/
+            components/
+        index.html
+        package.json
+        vite.config.js  # proxies /api/* to localhost:8000 in dev
+    server.py           # FastAPI app, StaticFiles mount, uvicorn entry point
+```
+
+**Implications**:
+- `crittercam serve` starts Uvicorn on a configurable port (default 8000)
+- `crittercam build-ui` runs `npm run build` inside `crittercam/web/ui/` and is
+  a prerequisite for `crittercam serve` in production
+- `Procfile.dev` at repo root runs both servers simultaneously for development
+- `node_modules/` and `dist/` are gitignored
+- A new CLI module `cmd_serve.py` is added under `crittercam/cli/`
+
+---
+
 <!-- Add new decisions below this line, incrementing the number -->

@@ -108,20 +108,53 @@
 **Status**: Not started
 
 ### Scope
-- Local web dashboard (browse images + detections)
-- Filter / search UI
-- Label correction interface
-- Correction feedback loop to Phase 2
+- Local web dashboard served by FastAPI + Uvicorn (Python backend) and React + Vite
+  (frontend)
+- Three-tab layout: Home, Browse, Analytics
+- Phase 4a (first pass): read-only; no label correction
+- Phase 4b (future): label correction interface and feedback loop to Phase 2
+
+### Tab: Home
+- Summary statistics: total images ingested, total detections, unique species seen
+- Detection counts over time (bar or line chart)
+- Strip of the most recent detection crops as a quick visual summary
+
+### Tab: Browse
+- Thumbnail grid of detection crops, newest first
+- Sidebar filters: species (dropdown), date range (date picker)
+- Click a thumbnail to open a detail panel showing the detection crop alongside the
+  full image with bounding box overlay, plus metadata (species, confidence, model
+  version, captured_at, temperature)
+
+### Tab: Analytics
+- Phase 4a: placeholder — "coming soon" state
+- Phase 4b onwards: species breakdown, time-of-day activity patterns, temperature vs.
+  activity correlation, and further charts as needed
+- Each visualization is an independent React component backed by a dedicated FastAPI
+  endpoint; new charts can be added without touching existing code
+
+### Resolved
+- Backend: FastAPI + Uvicorn (Decision 019)
+- Frontend: React + Vite (Decision 019)
+- Chart library: Recharts (Decision 019)
+- Directory layout: React source inside `crittercam/web/ui/`; single Uvicorn process
+  in production serving both API and built static files (Decision 020)
+- Dev workflow: `Procfile.dev` runs Vite and Uvicorn simultaneously; Vite proxies
+  `/api/*` to Uvicorn (Decision 020)
+- Label correction: deferred to Phase 4b; DB schema already has `human_label` and
+  `corrected_at` fields reserved
 
 ### Open questions
-- [ ] Web framework choice
-- [ ] How does a correction get stored — override field in DB, or new record?
-- [ ] Should corrections trigger re-processing or just update the label?
+- [ ] Port configuration — hardcoded default (8000) or added to `config.toml`?
+- [ ] Should `crittercam serve` auto-open the browser on start?
+- [ ] Pagination strategy for the browse grid — page numbers or infinite scroll?
 
-### Completion criteria
-- [ ] Browse all detections with thumbnail + metadata
-- [ ] Correct a wrong label in under 3 clicks
-- [ ] Corrections are clearly distinguished from AI-generated labels in the DB
+### Completion criteria (Phase 4a)
+- [ ] `crittercam build-ui` compiles the React app without errors
+- [ ] `crittercam serve` starts the dashboard; browser shows Home tab with live data
+- [ ] Browse tab shows detection crops; species and date filters narrow results correctly
+- [ ] Detail panel shows crop + full image with bounding box for any detection
+- [ ] Analytics tab renders a placeholder
 
 ---
 
