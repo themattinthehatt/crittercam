@@ -1,4 +1,4 @@
-![](assets/cirttercam_banner.jpg)
+![](assets/crittercam_banner.png)
 
 Backyard wildlife camera trap pipeline for ingestion, species identification, and local dashboard.
 
