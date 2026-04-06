@@ -7,43 +7,61 @@ from crittercam.web.api import get_conn
 router = APIRouter()
 
 
-@router.get('/api/detections/first')
-def first_detection() -> dict:
-    """Return the first active detection that has a crop image.
+PAGE_SIZE = 24
 
-    Used in Step 4 to demonstrate image serving.
+
+@router.get('/api/detections')
+def list_detections(page: int = 1, page_size: int = PAGE_SIZE) -> dict:
+    """Return a paginated list of active detections for the thumbnail grid.
+
+    Args:
+        page: 1-based page number
+        page_size: number of detections per page (default 24)
 
     Returns:
-        dict with id, label, confidence, and crop_url
-
-    Raises:
-        HTTPException: 404 if no qualifying detection exists
+        dict with 'detections' list, 'total' count, 'page', and 'page_size'
     """
     conn = get_conn()
 
-    row = conn.execute(
+    total = conn.execute(
+        '''
+        SELECT COUNT(*) FROM detections
+        WHERE is_active = 1
+          AND crop_path IS NOT NULL
+          AND label != 'blank'
+        '''
+    ).fetchone()[0]
+
+    rows = conn.execute(
         '''
         SELECT id, label, confidence, crop_path
         FROM detections
         WHERE is_active = 1
           AND crop_path IS NOT NULL
           AND label != 'blank'
-        ORDER BY id ASC
-        LIMIT 1
-        '''
-    ).fetchone()
+        ORDER BY id DESC
+        LIMIT :limit OFFSET :offset
+        ''',
+        {'limit': page_size, 'offset': (page - 1) * page_size},
+    ).fetchall()
 
     conn.close()
 
-    if row is None:
-        raise HTTPException(status_code=404, detail='no detections found')
-
     return {
-        'id': row['id'],
-        'label': row['label'],
-        'confidence': round(row['confidence'], 3),
-        'crop_url': f'/media/{row["crop_path"]}',
+        'detections': [
+            {
+                'id': row['id'],
+                'label': row['label'].split(';')[-1],
+                'confidence': round(row['confidence'], 3),
+                'crop_url': f'/media/{row["crop_path"]}',
+            }
+            for row in rows
+        ],
+        'total': total,
+        'page': page,
+        'page_size': page_size,
     }
+
 
 
 @router.get('/api/detections/{detection_id}')
