@@ -1,9 +1,8 @@
 """Stats API endpoints — summary counts and analytics data."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-import crittercam.config as config_module
-import crittercam.pipeline.db as db
+from crittercam.web.api import get_conn
 
 router = APIRouter()
 
@@ -15,14 +14,7 @@ def summary() -> dict:
     Returns:
         dict with total_images, total_detections, and species_seen counts
     """
-    try:
-        config = config_module.load()
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=500, detail='crittercam config not found — run crittercam setup first'
-        )
-
-    conn = db.connect(config.db_path)
+    conn = get_conn()
 
     total_images = conn.execute('SELECT COUNT(*) FROM images').fetchone()[0]
 

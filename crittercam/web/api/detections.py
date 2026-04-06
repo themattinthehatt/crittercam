@@ -2,8 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-import crittercam.config as config_module
-import crittercam.pipeline.db as db
+from crittercam.web.api import get_conn
 
 router = APIRouter()
 
@@ -20,12 +19,7 @@ def first_detection() -> dict:
     Raises:
         HTTPException: 404 if no qualifying detection exists
     """
-    try:
-        config = config_module.load()
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail='crittercam config not found — run crittercam setup first')
-
-    conn = db.connect(config.db_path)
+    conn = get_conn()
 
     row = conn.execute(
         '''
@@ -48,6 +42,78 @@ def first_detection() -> dict:
         'id': row['id'],
         'label': row['label'],
         'confidence': round(row['confidence'], 3),
-        # the browser will request this URL to load the image
         'crop_url': f'/media/{row["crop_path"]}',
+    }
+
+
+@router.get('/api/detections/{detection_id}')
+def get_detection(detection_id: int) -> dict:
+    """Return a single detection by ID, with adjacent IDs for navigation.
+
+    prev_id and next_id are the nearest active detections with crop images
+    in either direction. They are null at the boundaries of the dataset.
+
+    Args:
+        detection_id: primary key of the detection row
+
+    Returns:
+        dict with id, label, confidence, crop_url, prev_id, next_id
+
+    Raises:
+        HTTPException: 404 if the detection does not exist
+    """
+    conn = get_conn()
+
+    row = conn.execute(
+        '''
+        SELECT id, label, confidence, crop_path
+        FROM detections
+        WHERE id = :id
+          AND is_active = 1
+          AND crop_path IS NOT NULL
+          AND label != 'blank'
+        ''',
+        {'id': detection_id},
+    ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'detection {detection_id} not found')
+
+    # find the nearest detection with a lower id
+    prev_row = conn.execute(
+        '''
+        SELECT id FROM detections
+        WHERE id < :id
+          AND is_active = 1
+          AND crop_path IS NOT NULL
+          AND label != 'blank'
+        ORDER BY id DESC
+        LIMIT 1
+        ''',
+        {'id': detection_id},
+    ).fetchone()
+
+    # find the nearest detection with a higher id
+    next_row = conn.execute(
+        '''
+        SELECT id FROM detections
+        WHERE id > :id
+          AND is_active = 1
+          AND crop_path IS NOT NULL
+          AND label != 'blank'
+        ORDER BY id ASC
+        LIMIT 1
+        ''',
+        {'id': detection_id},
+    ).fetchone()
+
+    conn.close()
+
+    return {
+        'id': row['id'],
+        'label': row['label'],
+        'confidence': round(row['confidence'], 3),
+        'crop_url': f'/media/{row["crop_path"]}',
+        'prev_id': prev_row['id'] if prev_row else None,
+        'next_id': next_row['id'] if next_row else None,
     }
