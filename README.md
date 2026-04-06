@@ -44,6 +44,41 @@ You will be prompted for:
 
 The config is written to `~/.config/crittercam/config.toml` and can be updated by running `crittercam setup` again.
 
+### 5. Install Node.js (for the web dashboard)
+
+The dashboard frontend requires Node.js. Install it via conda:
+
+```bash
+conda install -n critter -c conda-forge nodejs
+```
+
+Verify the install:
+
+```bash
+node --version   # should print v20 or later
+npm --version
+```
+
+### 6. Install frontend dependencies
+
+From the repo root:
+
+```bash
+npm --prefix crittercam/web/ui install
+```
+
+This downloads the React and Vite packages into `crittercam/web/ui/node_modules/`. Only needed once (and again after pulling changes that update `package.json`).
+
+### 7. Install honcho (dev process manager)
+
+```bash
+pip install honcho
+```
+
+Honcho reads `Procfile.dev` and starts the API server and Vite dev server together with one command.
+
+---
+
 ## Usage
 
 ### Ingest images
@@ -81,3 +116,26 @@ Each image produces:
 ```bash
 crittercam classify --country USA --admin1-region CT --crop-padding 0.20
 ```
+
+### Run the dashboard
+
+**Development** (hot-reloading UI, recommended while building):
+
+```bash
+honcho start -f Procfile.dev
+```
+
+This starts two processes simultaneously:
+- FastAPI/Uvicorn on `http://localhost:8000` — the API
+- Vite on `http://localhost:5173` — the UI (visit this in the browser)
+
+Vite automatically forwards `/api/*` and `/media/*` requests to the FastAPI server, so the browser only needs to know about port 5173.
+
+**Production** (single server, requires a one-time UI build):
+
+```bash
+crittercam build-ui   # compiles the React app into crittercam/web/ui/dist/
+crittercam serve      # serves API + built UI from a single Uvicorn process
+```
+
+Then visit `http://localhost:8000`.

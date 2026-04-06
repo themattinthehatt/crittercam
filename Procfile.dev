@@ -1,0 +1,2 @@
+api: conda run -n critter uvicorn crittercam.web.server:app --reload --port 8000
+ui:  npm --prefix crittercam/web/ui run dev
