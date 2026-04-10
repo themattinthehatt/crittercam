@@ -1,61 +1,105 @@
 import { useState, useEffect } from 'react'
+import DetailPanel from './DetailPanel.jsx'
+import FilterBar from './FilterBar.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
-
-  // result holds the full API response: { detections, total, page, page_size }
   const [result, setResult] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
 
-  // Re-fetch whenever page changes — same pattern as DetectionViewer with currentId.
-  // When the user clicks a page button, setPage fires, React re-renders,
-  // sees page changed in the dependency array, and re-runs this effect.
+  // filter state — empty string means "no filter applied"
+  const [species, setSpecies] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  // species list for the dropdown — fetched once on mount
+  const [speciesList, setSpeciesList] = useState([])
+
   useEffect(() => {
-    setResult(null)  // clear while loading
-    fetch(`/api/detections?page=${page}`)
-      .then(response => response.json())
+    fetch('/api/species')
+      .then(r => r.json())
+      .then(data => setSpeciesList(data))
+  }, [])  // [] means run once when the component first mounts, never again
+
+  // re-fetch whenever page or any filter changes.
+  // URLSearchParams builds the query string cleanly: it only adds a key
+  // when we append it, so omitted filters don't appear in the URL at all.
+  useEffect(() => {
+    setResult(null)
+    setSelectedId(null)
+
+    const params = new URLSearchParams({ page })
+    if (species) params.append('species', species)
+    if (dateFrom) params.append('date_from', dateFrom)
+    if (dateTo) params.append('date_to', dateTo)
+
+    fetch(`/api/detections?${params}`)
+      .then(r => r.json())
       .then(data => setResult(data))
-  }, [page])
+  }, [page, species, dateFrom, dateTo])
 
-  if (result === null) {
-    return <div className="detection-grid-container">Loading…</div>
-  }
-
-  const totalPages = Math.ceil(result.total / result.page_size)
+  // changing a filter resets to page 1 — if you're on page 3 of unfiltered
+  // results, page 3 may not exist in the filtered set.
+  // wrapping each setter ensures the page reset and filter change happen together.
+  const handleSpeciesChange = value => { setSpecies(value); setPage(1) }
+  const handleDateFromChange = value => { setDateFrom(value); setPage(1) }
+  const handleDateToChange = value => { setDateTo(value); setPage(1) }
 
   return (
-    <div className="detection-grid-container">
-      <div className="detection-grid">
-        {result.detections.map(detection => (
-          <div key={detection.id} className="grid-cell">
-            <img
-              src={detection.crop_url}
-              alt={detection.label}
-              title={`${detection.label} (${(detection.confidence * 100).toFixed(1)}%)`}
-            />
-            <div className="grid-cell-label">{detection.label}</div>
-          </div>
-        ))}
+    <div className={`browse-layout${selectedId !== null ? ' browse-layout--open' : ''}`}>
+      <div className="detection-grid-container">
+        <FilterBar
+          species={species} onSpeciesChange={handleSpeciesChange}
+          dateFrom={dateFrom} onDateFromChange={handleDateFromChange}
+          dateTo={dateTo} onDateToChange={handleDateToChange}
+          speciesList={speciesList}
+        />
+
+        {result === null ? (
+          <div>Loading…</div>
+        ) : (
+          <>
+            <div className="detection-grid">
+              {result.detections.map(detection => (
+                <div
+                  key={detection.id}
+                  className={`grid-cell${selectedId === detection.id ? ' grid-cell--selected' : ''}`}
+                  onClick={() => setSelectedId(detection.id)}
+                >
+                  <img
+                    src={detection.crop_url}
+                    alt={detection.label}
+                    title={`${detection.label} (${(detection.confidence * 100).toFixed(1)}%)`}
+                  />
+                  <div className="grid-cell-label">{detection.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pagination">
+              <button onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+                ← prev
+              </button>
+              <span className="pagination-info">
+                page {page} of {Math.ceil(result.total / result.page_size)}
+              </span>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page === Math.ceil(result.total / result.page_size)}
+              >
+                next →
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="pagination">
-        <button
-          onClick={() => setPage(p => p - 1)}
-          disabled={page === 1}
-        >
-          ← prev
-        </button>
-
-        <span className="pagination-info">
-          page {page} of {totalPages}
-        </span>
-
-        <button
-          onClick={() => setPage(p => p + 1)}
-          disabled={page === totalPages}
-        >
-          next →
-        </button>
-      </div>
+      {selectedId !== null && (
+        <DetailPanel
+          detectionId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   )
 }
