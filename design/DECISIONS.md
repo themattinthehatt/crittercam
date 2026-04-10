@@ -577,15 +577,22 @@ use.
 ```
 crittercam/web/
     api/
-        detections.py   # GET /api/detections — filterable detection list
-        images.py       # GET /api/images/:id — full image + bbox metadata
-        stats.py        # GET /api/stats/* — analytics endpoints
+        __init__.py     # shared get_conn() helper
+        detections.py   # GET /api/detections, /api/species, /api/detections/{id}
+        stats.py        # GET /api/stats/summary
     ui/
         src/
             components/
+                StatsBar.jsx      # summary statistics
+                DetectionGrid.jsx # paginated thumbnail grid with filters
+                FilterBar.jsx     # species dropdown + date range inputs
+                DetailPanel.jsx   # crop + full image with SVG bbox overlay
+            App.jsx
+            App.css
+            index.css
         index.html
         package.json
-        vite.config.js  # proxies /api/* to localhost:8000 in dev
+        vite.config.js  # proxies /api/* and /media/* to localhost:8000 in dev
     server.py           # FastAPI app, StaticFiles mount, uvicorn entry point
 ```
 

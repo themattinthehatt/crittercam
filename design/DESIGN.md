@@ -127,15 +127,22 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
 │   └── web/                         # Phase 4 dashboard
 │       ├── api/                     # FastAPI route modules
-│       │   ├── detections.py        # GET /api/detections — filterable list
-│       │   ├── images.py            # GET /api/images/:id — full image metadata
-│       │   └── stats.py             # GET /api/stats/* — analytics endpoints
+│       │   ├── __init__.py          # shared get_conn() helper
+│       │   ├── detections.py        # GET /api/detections, /api/species, /api/detections/{id}
+│       │   └── stats.py             # GET /api/stats/summary
 │       ├── ui/                      # React app (Vite)
 │       │   ├── src/
-│       │   │   └── components/
+│       │   │   ├── components/
+│       │   │   │   ├── StatsBar.jsx      # summary statistics
+│       │   │   │   ├── DetectionGrid.jsx # paginated thumbnail grid with filters
+│       │   │   │   ├── FilterBar.jsx     # species dropdown + date range inputs
+│       │   │   │   └── DetailPanel.jsx   # crop + full image with SVG bbox overlay
+│       │   │   ├── App.jsx
+│       │   │   ├── App.css
+│       │   │   └── index.css
 │       │   ├── index.html
 │       │   ├── package.json
-│       │   └── vite.config.js       # proxies /api/* to localhost:8000 in dev
+│       │   └── vite.config.js       # proxies /api/* and /media/* to localhost:8000 in dev
 │       └── server.py                # FastAPI app + StaticFiles mount + uvicorn entry
 ├── tests/                           # mirrors crittercam/ structure exactly
 │   ├── test_config.py

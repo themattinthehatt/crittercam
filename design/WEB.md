@@ -7,16 +7,16 @@ framework takes over.
 
 ---
 
-## Group A — The server, standing alone
+## Group A — The server, standing alone ✓
 
-**Step 1: A single FastAPI endpoint**
+**Step 1: A single FastAPI endpoint** ✓
 Add `fastapi` and `uvicorn` to the project, create `crittercam/web/server.py` with
 one endpoint: `GET /api/hello` returning `{"message": "hello"}`. Run uvicorn manually
 and visit it in the browser.
 *Learns: what a web server is, what an HTTP GET request is, what JSON over HTTP looks
 like. Also visit `/docs` — FastAPI gives you an interactive API explorer for free.*
 
-**Step 2: A real endpoint backed by the database**
+**Step 2: A real endpoint backed by the database** ✓
 Add `GET /api/stats/summary` returning `{"total_images": N, "total_detections": N,
 "species_seen": N}`. This requires reading the config and querying SQLite — both
 things you already know how to do.
@@ -25,16 +25,16 @@ just Python you already understand.*
 
 ---
 
-## Group B — The browser, without React
+## Group B — The browser, without React ✓
 
-**Step 3: A hand-written HTML page**
+**Step 3: A hand-written HTML page** ✓
 Add a `GET /` route that returns a raw HTML string. That HTML includes a `<script>`
 block that calls `fetch('/api/stats/summary')` and writes the numbers into the page.
 *Learns: HTML structure, what JavaScript is, how `fetch()` and `async/await` work,
 how the browser executes JS and modifies the page — the raw mechanics before any
 framework.*
 
-**Step 4: Serving an image over HTTP**
+**Step 4: Serving an image over HTTP** ✓
 Add a media-serving route (FastAPI `FileResponse`) that serves image files from
 `data_root`. Add `GET /api/detections/first` returning one detection row. Display
 the detection crop `<img>` in the HTML page alongside its label and confidence.
@@ -43,9 +43,9 @@ API flows into HTML.*
 
 ---
 
-## Group C — Introducing React and Vite
+## Group C — Introducing React and Vite ✓
 
-**Step 5: Set up Vite + the dev proxy**
+**Step 5: Set up Vite + the dev proxy** ✓
 Scaffold the React app with `npm create vite@latest` inside `crittercam/web/ui/`.
 Get the default Vite "Hello World" running. Configure `vite.config.js` to proxy
 `/api/*` to `localhost:8000`. Set up `Procfile.dev` to start both servers with one
@@ -54,7 +54,7 @@ command.
 python), what Vite does (bundles and hot-reloads JS, like a dev server), what a
 proxy is and why it's needed.*
 
-**Step 6: First React component with live data**
+**Step 6: First React component with live data** ✓
 Replace the static HTML with a `StatsBar` React component. It calls
 `/api/stats/summary` via `fetch` and renders the counts. Introduce `useState` and
 `useEffect`.
@@ -64,33 +64,33 @@ component mounts — the React equivalent of "run this code once on startup".*
 
 ---
 
-## Group D — Building the Browse tab
+## Group D — Building the Browse tab ✓
 
-**Step 7: Previous/Next through a single image**
+**Step 7: Previous/Next through a single image** ✓
 Add `GET /api/detections/:id` returning one detection's crop, full image, label,
 confidence, and `prev_id`/`next_id`. A React component shows the crop image and two
 arrow buttons. Clicking next loads the next detection.
 *Learns: how state changes trigger re-renders (the core React loop), how to pass
 data between a component's state and the API.*
 
-**Step 8: A thumbnail grid**
+**Step 8: A thumbnail grid** ✓
 Add `GET /api/detections` returning the first 24 detections. Render them as a CSS
 grid of `<img>` thumbnails using `.map()`.
 *Learns: how to render a list of items in React, basic CSS Grid layout.*
 
-**Step 9: Pagination**
+**Step 9: Pagination** ✓
 Add `page` and `page_size` query parameters to `GET /api/detections`. Add page
 number controls to the grid component.
 *Learns: query parameters in API design, how changing state (current page number)
 triggers a new fetch and re-render.*
 
-**Step 10: Detail panel on click**
+**Step 10: Detail panel on click** ✓
 Clicking a thumbnail shows a side panel with the detection crop, the full image, a
 bounding box drawn as an SVG overlay, and the metadata fields.
 *Learns: event handlers, conditional rendering, SVG overlays (a clean way to draw
 on top of images).*
 
-**Step 11: Species and date filters**
+**Step 11: Species and date filters** ✓
 Add a species dropdown and a date range input above the grid. Selecting a filter
 re-fetches with the new parameters appended to the URL. Update the API to support
 `species`, `date_from`, `date_to` query params.

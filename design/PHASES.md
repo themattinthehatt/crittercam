@@ -105,7 +105,7 @@
 ---
 
 ## Phase 4 — Review & query interface
-**Status**: Not started
+**Status**: In progress (Browse tab complete; Home tab, tab navigation, and CLI integration remaining)
 
 ### Scope
 - Local web dashboard served by FastAPI + Uvicorn (Python backend) and React + Vite
@@ -143,17 +143,36 @@
   `/api/*` to Uvicorn (Decision 020)
 - Label correction: deferred to Phase 4b; DB schema already has `human_label` and
   `corrected_at` fields reserved
+- Port: hardcoded at 8000 for now; may be moved to `config.toml` in a future pass
+- Auto-open browser: yes — `crittercam serve` will call `webbrowser.open()` on start
+- Pagination: page numbers (not infinite scroll) — simpler state, friendlier for
+  filtered result sets where total count is known
 
-### Open questions
-- [ ] Port configuration — hardcoded default (8000) or added to `config.toml`?
-- [ ] Should `crittercam serve` auto-open the browser on start?
-- [ ] Pagination strategy for the browse grid — page numbers or infinite scroll?
+### Done
+- [x] FastAPI server (`web/server.py`) with media file serving (`GET /media/{path}`)
+- [x] Shared DB connection helper (`web/api/__init__.py`)
+- [x] `GET /api/stats/summary` — total images, detections, species seen
+- [x] `GET /api/detections` — paginated list with species and date filters
+- [x] `GET /api/species` — sorted list of distinct species for the filter dropdown
+- [x] `GET /api/detections/{id}` — single detection with bbox, full image URL, temperature, prev/next IDs
+- [x] Vite + React scaffold with `/api/*` and `/media/*` proxy to Uvicorn
+- [x] `Procfile.dev` for parallel dev server startup
+- [x] `StatsBar` component — summary statistics with live data
+- [x] `DetectionGrid` component — paginated thumbnail grid
+- [x] `FilterBar` component — controlled species dropdown and date range inputs
+- [x] `DetailPanel` component — crop + full image with SVG bounding box overlay, metadata
+
+### Remaining
+- [ ] Home tab — recent crops strip and detection-over-time chart (Recharts)
+- [ ] Three-tab layout — App-level tab state, conditional rendering of Home/Browse/Analytics
+- [ ] `crittercam serve` CLI command — starts Uvicorn, opens browser
+- [ ] `crittercam build-ui` — runs `npm run build`, production static file serving
 
 ### Completion criteria (Phase 4a)
 - [ ] `crittercam build-ui` compiles the React app without errors
 - [ ] `crittercam serve` starts the dashboard; browser shows Home tab with live data
-- [ ] Browse tab shows detection crops; species and date filters narrow results correctly
-- [ ] Detail panel shows crop + full image with bounding box for any detection
+- [x] Browse tab shows detection crops; species and date filters narrow results correctly
+- [x] Detail panel shows crop + full image with bounding box for any detection
 - [ ] Analytics tab renders a placeholder
 
 ---
