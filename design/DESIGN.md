@@ -128,15 +128,17 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   └── web/                         # Phase 4 dashboard
 │       ├── api/                     # FastAPI route modules
 │       │   ├── __init__.py          # shared get_conn() helper
-│       │   ├── detections.py        # GET /api/detections, /api/species, /api/detections/{id}
-│       │   └── stats.py             # GET /api/stats/summary
+│       │   ├── detections.py        # GET /api/detections, /api/detections/recent_by_species, /api/detections/{id}, /api/species
+│       │   └── stats.py             # GET /api/stats/summary, /api/stats/detections_over_time
 │       ├── ui/                      # React app (Vite)
 │       │   ├── src/
 │       │   │   ├── components/
-│       │   │   │   ├── StatsBar.jsx      # summary statistics
-│       │   │   │   ├── DetectionGrid.jsx # paginated thumbnail grid with filters
-│       │   │   │   ├── FilterBar.jsx     # species dropdown + date range inputs
-│       │   │   │   └── DetailPanel.jsx   # crop + full image with SVG bbox overlay
+│       │   │   │   ├── StatsBar.jsx           # summary statistics
+│       │   │   │   ├── RecentBySpecies.jsx    # most recent crop per species (Home tab)
+│       │   │   │   ├── DetectionsOverTime.jsx # weekly line chart (Analytics tab)
+│       │   │   │   ├── DetectionGrid.jsx      # paginated thumbnail grid with filters
+│       │   │   │   ├── FilterBar.jsx          # species dropdown + date range inputs
+│       │   │   │   └── DetailPanel.jsx        # crop + full image with SVG bbox overlay
 │       │   │   ├── App.jsx
 │       │   │   ├── App.css
 │       │   │   └── index.css

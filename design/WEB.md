@@ -99,18 +99,19 @@ string.*
 
 ---
 
-## Group E — Home tab and tab navigation
+## Group E — Home tab and tab navigation ✓
 
-**Step 12: Home tab**
-Add `GET /api/stats/recent_crops` (last N detection crops) and
-`GET /api/stats/detections_over_time`. Build the Home tab: summary numbers from
-Step 2, a strip of recent crop thumbnails, a Recharts bar chart.
-*Learns: Recharts (just a React component that takes data as props), multiple
-parallel fetches from one component.*
+**Step 12: Home tab** ✓
+Add `GET /api/detections/recent_by_species` (most recent detection per species,
+excluding blank and human) and `GET /api/stats/detections_over_time` (weekly counts
+per species for the past year, species with >10 detections only). Build the Home tab:
+summary numbers from Step 2, a species thumbnail grid, a Recharts line chart.
+*Learns: Recharts (just a React component that takes data as props), pivoting
+row-oriented SQL results into the wide format Recharts expects.*
 
-**Step 13: Three-tab layout**
-Wire up tab navigation: Home, Browse, Analytics (placeholder). Tab state lives in
-the top-level `App` component and conditionally renders the right tab content.
+**Step 13: Three-tab layout** ✓
+Wire up tab navigation: Home, Browse, Analytics. Tab state lives in the top-level
+`App` component and conditionally renders the right tab content.
 *Learns: lifting state up (the App component owns the active tab; child components
 react to it), component composition.*
 

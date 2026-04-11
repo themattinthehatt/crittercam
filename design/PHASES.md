@@ -105,7 +105,7 @@
 ---
 
 ## Phase 4 — Review & query interface
-**Status**: In progress (Browse tab complete; Home tab, tab navigation, and CLI integration remaining)
+**Status**: In progress (Home, Browse, and Analytics tabs complete; CLI integration remaining)
 
 ### Scope
 - Local web dashboard served by FastAPI + Uvicorn (Python backend) and React + Vite
@@ -127,9 +127,9 @@
   version, captured_at, temperature)
 
 ### Tab: Analytics
-- Phase 4a: placeholder — "coming soon" state
-- Phase 4b onwards: species breakdown, time-of-day activity patterns, temperature vs.
-  activity correlation, and further charts as needed
+- Weekly detections per species line chart (past year, species with >10 detections)
+- Phase 4b onwards: time-of-day activity patterns, temperature vs. activity
+  correlation, and further charts as needed
 - Each visualization is an independent React component backed by a dedicated FastAPI
   endpoint; new charts can be added without touching existing code
 
@@ -152,19 +152,22 @@
 - [x] FastAPI server (`web/server.py`) with media file serving (`GET /media/{path}`)
 - [x] Shared DB connection helper (`web/api/__init__.py`)
 - [x] `GET /api/stats/summary` — total images, detections, species seen
-- [x] `GET /api/detections` — paginated list with species and date filters
-- [x] `GET /api/species` — sorted list of distinct species for the filter dropdown
+- [x] `GET /api/stats/detections_over_time` — weekly counts per species for past year
+- [x] `GET /api/detections` — paginated list with species, date, and human/blank filters
+- [x] `GET /api/detections/recent_by_species` — most recent detection per species
+- [x] `GET /api/detections/species` — sorted list of distinct species for the filter dropdown
 - [x] `GET /api/detections/{id}` — single detection with bbox, full image URL, temperature, prev/next IDs
 - [x] Vite + React scaffold with `/api/*` and `/media/*` proxy to Uvicorn
 - [x] `Procfile.dev` for parallel dev server startup
+- [x] Three-tab layout (Home, Browse, Analytics) with tab state in `App`
 - [x] `StatsBar` component — summary statistics with live data
+- [x] `RecentBySpecies` component — most recent crop per species on Home tab
+- [x] `DetectionsOverTime` component — Recharts line chart on Analytics tab
 - [x] `DetectionGrid` component — paginated thumbnail grid
 - [x] `FilterBar` component — controlled species dropdown and date range inputs
 - [x] `DetailPanel` component — crop + full image with SVG bounding box overlay, metadata
 
 ### Remaining
-- [ ] Home tab — recent crops strip and detection-over-time chart (Recharts)
-- [ ] Three-tab layout — App-level tab state, conditional rendering of Home/Browse/Analytics
 - [ ] `crittercam serve` CLI command — starts Uvicorn, opens browser
 - [ ] `crittercam build-ui` — runs `npm run build`, production static file serving
 
@@ -173,7 +176,7 @@
 - [ ] `crittercam serve` starts the dashboard; browser shows Home tab with live data
 - [x] Browse tab shows detection crops; species and date filters narrow results correctly
 - [x] Detail panel shows crop + full image with bounding box for any detection
-- [ ] Analytics tab renders a placeholder
+- [x] Analytics tab shows weekly detections per species line chart
 
 ---
 
