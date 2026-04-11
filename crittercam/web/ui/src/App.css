@@ -76,6 +76,25 @@ header p {
   text-overflow: ellipsis;
 }
 
+.grid-cell-date {
+  font-size: 0.7rem;
+  color: #999;
+  white-space: nowrap;
+}
+
+.section-heading {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin: 0 0 0.75rem 0;
+  font-weight: normal;
+}
+
+.recent-by-species {
+  margin-top: 2rem;
+}
+
 .pagination {
   display: flex;
   align-items: center;

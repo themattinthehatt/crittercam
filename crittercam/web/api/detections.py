@@ -27,7 +27,7 @@ def list_species() -> list[str]:
         SELECT DISTINCT label FROM detections
         WHERE is_active = 1
           AND crop_path IS NOT NULL
-          AND label != 'blank'
+          AND LOWER(label) NOT LIKE '%blank%'
         '''
     ).fetchall()
     conn.close()
@@ -63,7 +63,8 @@ def list_detections(
     conditions = [
         'd.is_active = 1',
         'd.crop_path IS NOT NULL',
-        "d.label != 'blank'",
+        "LOWER(d.label) NOT LIKE '%blank%'",
+        "LOWER(d.label) NOT LIKE '%human%'",
     ]
     params: dict = {}
 
@@ -122,6 +123,52 @@ def list_detections(
     }
 
 
+@router.get('/api/detections/recent_by_species')
+def recent_by_species() -> list[dict]:
+    """Return the most recent active detection for each distinct species.
+
+    Excludes blank frames and human detections. The subquery finds the highest
+    detection id per label; the outer query joins back to retrieve the full row.
+    Results are ordered by detection id descending (most recently detected species
+    first).
+
+    Returns:
+        list of dicts, each with id, label, confidence, crop_url, captured_at
+    """
+    conn = get_conn()
+
+    rows = conn.execute(
+        '''
+        SELECT d.id, d.label, d.confidence, d.crop_path, i.captured_at
+        FROM detections d
+        JOIN images i ON i.id = d.image_id
+        INNER JOIN (
+            SELECT label, MAX(id) AS max_id
+            FROM detections
+            WHERE is_active = 1
+              AND crop_path IS NOT NULL
+              AND LOWER(label) NOT LIKE '%blank%'
+              AND LOWER(label) NOT LIKE '%human%'
+            GROUP BY label
+        ) latest ON d.id = latest.max_id
+        ORDER BY d.id DESC
+        '''
+    ).fetchall()
+
+    conn.close()
+
+    return [
+        {
+            'id': row['id'],
+            'label': row['label'].split(';')[-1],
+            'confidence': round(row['confidence'], 3),
+            'crop_url': f'/media/{row["crop_path"]}',
+            'captured_at': row['captured_at'],
+        }
+        for row in rows
+    ]
+
+
 @router.get('/api/detections/{detection_id}')
 def get_detection(detection_id: int) -> dict:
     """Return a single detection by ID, with adjacent IDs for navigation.
@@ -150,7 +197,8 @@ def get_detection(detection_id: int) -> dict:
         WHERE d.id = :id
           AND d.is_active = 1
           AND d.crop_path IS NOT NULL
-          AND d.label != 'blank'
+          AND LOWER(d.label) NOT LIKE '%blank%'
+          AND LOWER(d.label) NOT LIKE '%human%'
         ''',
         {'id': detection_id},
     ).fetchone()
@@ -165,7 +213,8 @@ def get_detection(detection_id: int) -> dict:
         WHERE id < :id
           AND is_active = 1
           AND crop_path IS NOT NULL
-          AND label != 'blank'
+          AND LOWER(label) NOT LIKE '%blank%'
+          AND LOWER(label) NOT LIKE '%human%'
         ORDER BY id DESC
         LIMIT 1
         ''',
@@ -179,7 +228,8 @@ def get_detection(detection_id: int) -> dict:
         WHERE id > :id
           AND is_active = 1
           AND crop_path IS NOT NULL
-          AND label != 'blank'
+          AND LOWER(label) NOT LIKE '%blank%'
+          AND LOWER(label) NOT LIKE '%human%'
         ORDER BY id ASC
         LIMIT 1
         ''',

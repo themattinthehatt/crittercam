@@ -23,7 +23,7 @@ def summary() -> dict:
     ).fetchone()[0]
 
     species_seen = conn.execute(
-        "SELECT COUNT(DISTINCT label) FROM detections WHERE is_active = 1 AND label != 'blank'"
+        "SELECT COUNT(DISTINCT label) FROM detections WHERE is_active = 1 AND LOWER(label) NOT LIKE '%blank%'"
     ).fetchone()[0]
 
     conn.close()

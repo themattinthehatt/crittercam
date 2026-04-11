@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import StatsBar from './components/StatsBar.jsx'
 import DetectionGrid from './components/DetectionGrid.jsx'
+import RecentBySpecies from './components/RecentBySpecies.jsx'
 import './App.css'
 
 // tab names drive both the nav buttons and the content switch below.
@@ -33,7 +34,12 @@ export default function App() {
       </nav>
 
       <main>
-        {activeTab === 'home' && <StatsBar />}
+        {activeTab === 'home' && (
+          <>
+            <StatsBar />
+            <RecentBySpecies />
+          </>
+        )}
         {activeTab === 'browse' && <DetectionGrid />}
         {activeTab === 'analytics' && (
           <p className="placeholder">analytics — coming soon</p>
