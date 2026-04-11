@@ -2,6 +2,7 @@ import { useState } from 'react'
 import StatsBar from './components/StatsBar.jsx'
 import DetectionGrid from './components/DetectionGrid.jsx'
 import RecentBySpecies from './components/RecentBySpecies.jsx'
+import DetectionsOverTime from './components/DetectionsOverTime.jsx'
 import './App.css'
 
 // tab names drive both the nav buttons and the content switch below.
@@ -41,9 +42,7 @@ export default function App() {
           </>
         )}
         {activeTab === 'browse' && <DetectionGrid />}
-        {activeTab === 'analytics' && (
-          <p className="placeholder">analytics — coming soon</p>
-        )}
+        {activeTab === 'analytics' && <DetectionsOverTime />}
       </main>
     </div>
   )
