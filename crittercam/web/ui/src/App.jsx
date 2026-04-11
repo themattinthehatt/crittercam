@@ -1,17 +1,43 @@
+import { useState } from 'react'
 import StatsBar from './components/StatsBar.jsx'
 import DetectionGrid from './components/DetectionGrid.jsx'
 import './App.css'
 
+// tab names drive both the nav buttons and the content switch below.
+// keeping them in one array means adding a new tab is a one-line change.
+const TABS = ['home', 'browse', 'analytics']
+
 export default function App() {
+  // activeTab lives here in App — the lowest common ancestor of the tab bar
+  // and the tab content. neither the nav nor the content panels can own this
+  // state themselves, because each needs to read what the other sets.
+  const [activeTab, setActiveTab] = useState('home')
+
   return (
     <div className="app">
       <header>
         <h1>crittercam</h1>
         <p>Wildlife detection dashboard</p>
       </header>
+
+      <nav className="tab-bar">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            className={`tab-button${activeTab === tab ? ' tab-button--active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+
       <main>
-        <StatsBar />
-        <DetectionGrid />
+        {activeTab === 'home' && <StatsBar />}
+        {activeTab === 'browse' && <DetectionGrid />}
+        {activeTab === 'analytics' && (
+          <p className="placeholder">analytics — coming soon</p>
+        )}
       </main>
     </div>
   )

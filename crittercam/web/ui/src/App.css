@@ -103,6 +103,40 @@ header p {
   color: #666;
 }
 
+/* tab navigation */
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 2rem;
+}
+
+.tab-button {
+  padding: 0.6rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;  /* sit on top of .tab-bar's border-bottom */
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.tab-button:hover {
+  color: #222;
+}
+
+.tab-button--active {
+  color: #222;
+  border-bottom-color: #222;
+}
+
+.placeholder {
+  color: #888;
+  font-size: 0.9rem;
+}
+
 /* filter bar */
 
 .filter-bar {
