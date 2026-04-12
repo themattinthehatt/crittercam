@@ -1,7 +1,10 @@
 """FastAPI application — entry point for the crittercam web dashboard."""
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 import crittercam.config as config_module
 from crittercam.web.api import detections, stats
@@ -10,6 +13,11 @@ app = FastAPI(title='crittercam')
 
 app.include_router(stats.router)
 app.include_router(detections.router)
+
+# mount built React app if present; skipped in development (Vite serves the UI)
+_DIST_DIR = Path(__file__).parent / 'ui' / 'dist'
+if _DIST_DIR.exists():
+    app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='ui')
 
 
 @app.get('/media/{path:path}')

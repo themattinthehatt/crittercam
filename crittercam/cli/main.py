@@ -6,6 +6,7 @@ from pathlib import Path
 
 from crittercam.cli.cmd_classify import cmd_classify
 from crittercam.cli.cmd_ingest import cmd_ingest
+from crittercam.cli.cmd_serve import cmd_build_ui, cmd_serve
 from crittercam.cli.cmd_setup import cmd_setup
 
 
@@ -46,6 +47,25 @@ def main() -> None:
         type=Path,
         metavar='PATH',
         help='override the data root from config',
+    )
+
+    # serve
+    serve_parser = subparsers.add_parser(
+        'serve',
+        help='start the web dashboard',
+    )
+    serve_parser.add_argument(
+        '--port',
+        type=int,
+        default=8000,
+        metavar='PORT',
+        help='port for the web server (default: 8000)',
+    )
+
+    # build-ui
+    subparsers.add_parser(
+        'build-ui',
+        help='build the React frontend for production use',
     )
 
     # classify
@@ -95,3 +115,7 @@ def main() -> None:
         cmd_ingest(args)
     elif args.command == 'classify':
         cmd_classify(args)
+    elif args.command == 'serve':
+        cmd_serve(args.port)
+    elif args.command == 'build-ui':
+        cmd_build_ui()
