@@ -69,6 +69,21 @@ def classify_pending(
         image_path = data_root / job['path']
         filename = job['filename']
 
+        # skip images whose active detection was human-corrected — those labels
+        # are permanent and must survive model reruns (mirrors reidentify_all policy)
+        human_row = conn.execute(
+            "SELECT id FROM detections"
+            " WHERE image_id = :image_id AND is_active = 1"
+            "   AND label_assigned_by = 'human'",
+            {'image_id': image_id},
+        ).fetchone()
+        if human_row:
+            logger.info(f'skipping {filename}: human label present')
+            mark_job(conn, job_id, 'done', completed_at=now())
+            conn.commit()
+            summary.classified += 1
+            continue
+
         mark_job(conn, job_id, status='running', started_at=now())
         conn.commit()
 
@@ -104,10 +119,14 @@ def classify_pending(
                 INSERT INTO detections
                     (image_id, label, confidence,
                      bbox_x, bbox_y, bbox_w, bbox_h,
-                     crop_path, model_name, model_version, is_active, created_at)
+                     crop_path, model_name, model_version,
+                     label_assigned_by, label_assigned_at,
+                     is_active, created_at)
                 VALUES (:image_id, :label, :confidence,
                         :bbox_x, :bbox_y, :bbox_w, :bbox_h,
-                        :crop_path, :model_name, :model_version, 1, :created_at)
+                        :crop_path, :model_name, :model_version,
+                        'algorithm', :label_assigned_at,
+                        1, :created_at)
                 ''',
                 {
                     'image_id': image_id,
@@ -120,6 +139,7 @@ def classify_pending(
                     'crop_path': str(crop_rel) if crop_rel else None,
                     'model_name': classifier.model_name,
                     'model_version': classifier.model_version,
+                    'label_assigned_at': ts,
                     'created_at': ts,
                 },
             )

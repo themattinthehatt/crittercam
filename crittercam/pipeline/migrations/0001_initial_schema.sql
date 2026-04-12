@@ -30,8 +30,8 @@ CREATE TABLE detections (
     model_version TEXT,
     is_active     INTEGER NOT NULL DEFAULT 1,
     created_at    TEXT    NOT NULL,
-    human_label   TEXT,
-    corrected_at  TEXT
+    label_assigned_by TEXT NOT NULL DEFAULT 'algorithm',
+    label_assigned_at TEXT
 );
 
 CREATE TABLE processing_jobs (

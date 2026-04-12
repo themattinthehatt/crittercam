@@ -178,6 +178,45 @@ class TestClassifyPending:
         assert rows[1]['label'] == 'bear'
         assert rows[1]['is_active'] == 1
 
+    def test_writes_label_assigned_by_algorithm(self, db, data_root, pending_image):
+        # Arrange
+        classifier = _MockClassifier([Detection(label='fox', confidence=0.8, bbox=None)])
+
+        # Act
+        classify_pending(data_root, db, classifier)
+
+        # Assert
+        row = db.execute('SELECT label_assigned_by FROM detections').fetchone()
+        assert row['label_assigned_by'] == 'algorithm'
+
+    def test_skips_image_with_human_assigned_label(self, db, data_root, pending_image):
+        # Arrange — existing active detection marked as human-assigned
+        db.execute(
+            '''
+            INSERT INTO detections
+                (image_id, label, confidence, model_name, is_active,
+                 label_assigned_by, created_at)
+            VALUES (?, 'human corrected species', 0.0, 'human', 1,
+                    'human', '2026-01-01T00:00:00+00:00')
+            ''',
+            (pending_image['image_id'],),
+        )
+        db.commit()
+        classifier = _MockClassifier([Detection(label='bear', confidence=0.95, bbox=None)])
+
+        # Act
+        summary = classify_pending(data_root, db, classifier)
+
+        # Assert — job counted as done but human label untouched
+        assert summary.classified == 1
+        assert summary.errors == {}
+        rows = db.execute(
+            'SELECT label, label_assigned_by FROM detections ORDER BY id'
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]['label'] == 'human corrected species'
+        assert rows[0]['label_assigned_by'] == 'human'
+
     def test_skips_non_pending_jobs(self, db, data_root, pending_image):
         # Arrange — mark the job as already done
         db.execute(
