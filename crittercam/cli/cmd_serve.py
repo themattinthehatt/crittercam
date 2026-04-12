@@ -1,25 +1,45 @@
-"""Serve and build-ui subcommands for the crittercam web dashboard."""
+"""Serve subcommand: start the crittercam web dashboard."""
 
-import subprocess
+import argparse
 import sys
 import webbrowser
 from pathlib import Path
 
 from crittercam.config import CONFIG_PATH, load
 
-# path to the React source, relative to this file's package root
 _UI_DIR = Path(__file__).parent.parent / 'web' / 'ui'
 
 
-def cmd_serve(port: int) -> None:
+def register(subparsers: argparse._SubParsersAction) -> None:
+    """Register the serve subcommand.
+
+    Args:
+        subparsers: the subparsers action from the root argument parser
+    """
+    parser = subparsers.add_parser(
+        'serve',
+        help='start the web dashboard',
+    )
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=8000,
+        metavar='PORT',
+        help='port for the web server (default: 8000)',
+    )
+    parser.set_defaults(handler=cmd_serve)
+
+
+def cmd_serve(args: argparse.Namespace) -> None:
     """Start the crittercam web dashboard.
 
     Loads config, mounts the built React app if present, opens the browser,
     and runs Uvicorn on the requested port.
 
     Args:
-        port: TCP port on which Uvicorn will listen
+        args: parsed command-line arguments
     """
+    port = args.port
     try:
         load(CONFIG_PATH)
     except FileNotFoundError:
@@ -43,29 +63,3 @@ def cmd_serve(port: int) -> None:
         port=port,
         reload=False,
     )
-
-
-def cmd_build_ui() -> None:
-    """Build the React frontend for production use.
-
-    Runs `npm run build` inside crittercam/web/ui/ and writes output to
-    crittercam/web/ui/dist/, which is then served by `crittercam serve`.
-
-    Raises:
-        SystemExit: if npm is not found or the build fails
-    """
-    if not _UI_DIR.exists():
-        print(f'Error: UI source directory not found at {_UI_DIR}')
-        sys.exit(1)
-
-    print(f'Building React app in {_UI_DIR} …')
-    result = subprocess.run(
-        ['npm', 'run', 'build'],
-        cwd=_UI_DIR,
-    )
-    if result.returncode != 0:
-        print('Error: npm run build failed.')
-        sys.exit(result.returncode)
-
-    dist_dir = _UI_DIR / 'dist'
-    print(f'Build complete. Output written to {dist_dir}')

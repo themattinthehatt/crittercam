@@ -1,19 +1,19 @@
 """Tests for crittercam.cli.cmd_serve."""
 
-import subprocess
-import sys
+import argparse
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 
-from crittercam.cli.cmd_serve import cmd_build_ui, cmd_serve
+from crittercam.cli.cmd_serve import cmd_serve
 from crittercam.config import Config
 
 
-# ---------------------------------------------------------------------------
-# cmd_serve
-# ---------------------------------------------------------------------------
+def _serve_args(port: int = 8000) -> argparse.Namespace:
+    """Build a minimal Namespace for cmd_serve."""
+    return argparse.Namespace(port=port)
+
 
 class TestCmdServe:
     """Test the cmd_serve function."""
@@ -26,7 +26,7 @@ class TestCmdServe:
         monkeypatch.setattr('crittercam.cli.cmd_serve.CONFIG_PATH', tmp_path / 'missing.toml')
         with patch('crittercam.cli.cmd_serve.load', side_effect=FileNotFoundError):
             with pytest.raises(SystemExit) as exc_info:
-                cmd_serve(port=8000)
+                cmd_serve(_serve_args())
         assert exc_info.value.code == 1
 
     def test_opens_browser_and_starts_uvicorn(self, tmp_path, monkeypatch):
@@ -37,7 +37,7 @@ class TestCmdServe:
         with patch('crittercam.cli.cmd_serve.load', return_value=config), \
                 patch('crittercam.cli.cmd_serve.webbrowser.open') as mock_browser, \
                 patch('uvicorn.run') as mock_uvicorn:
-            cmd_serve(port=8000)
+            cmd_serve(_serve_args(port=8000))
 
         mock_browser.assert_called_once_with('http://localhost:8000')
         mock_uvicorn.assert_called_once_with(
@@ -55,7 +55,7 @@ class TestCmdServe:
         with patch('crittercam.cli.cmd_serve.load', return_value=config), \
                 patch('crittercam.cli.cmd_serve.webbrowser.open') as mock_browser, \
                 patch('uvicorn.run') as mock_uvicorn:
-            cmd_serve(port=9000)
+            cmd_serve(_serve_args(port=9000))
 
         mock_browser.assert_called_once_with('http://localhost:9000')
         mock_uvicorn.assert_called_once_with(
@@ -68,15 +68,13 @@ class TestCmdServe:
     def test_warns_when_dist_missing(self, tmp_path, monkeypatch, capsys):
         # Arrange — no dist/ directory
         monkeypatch.setattr('crittercam.cli.cmd_serve.CONFIG_PATH', tmp_path / 'config.toml')
-        config = self._make_config(tmp_path)
-
-        # point _UI_DIR at a location without dist/
         monkeypatch.setattr('crittercam.cli.cmd_serve._UI_DIR', tmp_path / 'ui')
+        config = self._make_config(tmp_path)
 
         with patch('crittercam.cli.cmd_serve.load', return_value=config), \
                 patch('crittercam.cli.cmd_serve.webbrowser.open'), \
                 patch('uvicorn.run'):
-            cmd_serve(port=8000)
+            cmd_serve(_serve_args())
 
         captured = capsys.readouterr()
         assert 'Warning' in captured.out
@@ -93,56 +91,7 @@ class TestCmdServe:
         with patch('crittercam.cli.cmd_serve.load', return_value=config), \
                 patch('crittercam.cli.cmd_serve.webbrowser.open'), \
                 patch('uvicorn.run'):
-            cmd_serve(port=8000)
+            cmd_serve(_serve_args())
 
         captured = capsys.readouterr()
         assert 'Warning' not in captured.out
-
-
-# ---------------------------------------------------------------------------
-# cmd_build_ui
-# ---------------------------------------------------------------------------
-
-class TestCmdBuildUi:
-    """Test the cmd_build_ui function."""
-
-    def test_exits_when_ui_dir_missing(self, tmp_path, monkeypatch):
-        # Arrange — point _UI_DIR at a non-existent directory
-        monkeypatch.setattr('crittercam.cli.cmd_serve._UI_DIR', tmp_path / 'no_such_dir')
-
-        with pytest.raises(SystemExit) as exc_info:
-            cmd_build_ui()
-        assert exc_info.value.code == 1
-
-    def test_runs_npm_build(self, tmp_path, monkeypatch):
-        # Arrange — create a fake ui dir with a dist/ to simulate success
-        ui_dir = tmp_path / 'ui'
-        ui_dir.mkdir()
-        dist_dir = ui_dir / 'dist'
-        dist_dir.mkdir()
-        monkeypatch.setattr('crittercam.cli.cmd_serve._UI_DIR', ui_dir)
-
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-
-        with patch('subprocess.run', return_value=mock_result) as mock_run:
-            cmd_build_ui()
-
-        mock_run.assert_called_once_with(
-            ['npm', 'run', 'build'],
-            cwd=ui_dir,
-        )
-
-    def test_exits_on_npm_failure(self, tmp_path, monkeypatch):
-        # Arrange
-        ui_dir = tmp_path / 'ui'
-        ui_dir.mkdir()
-        monkeypatch.setattr('crittercam.cli.cmd_serve._UI_DIR', ui_dir)
-
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-
-        with patch('subprocess.run', return_value=mock_result):
-            with pytest.raises(SystemExit) as exc_info:
-                cmd_build_ui()
-        assert exc_info.value.code == 1

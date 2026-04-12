@@ -2,10 +2,57 @@
 
 import argparse
 import sys
+from pathlib import Path
 
 from crittercam.cli._geo import ADMIN1_RE, VALID_COUNTRY_CODES
 from crittercam.config import CONFIG_PATH, load
 from crittercam.pipeline.db import connect
+
+
+def register(subparsers: argparse._SubParsersAction) -> None:
+    """Register the classify subcommand.
+
+    Args:
+        subparsers: the subparsers action from the root argument parser
+    """
+    parser = subparsers.add_parser(
+        'classify',
+        help='run species classification on pending images',
+    )
+    parser.add_argument(
+        '--data-root',
+        type=Path,
+        metavar='PATH',
+        help='override the data root from config',
+    )
+    parser.add_argument(
+        '--country',
+        metavar='CODE',
+        help='override ISO 3166-1 alpha-3 country code for geofencing (e.g. USA)',
+    )
+    parser.add_argument(
+        '--admin1-region',
+        metavar='CODE',
+        help='override state/province abbreviation for geofencing (e.g. CT)',
+    )
+    parser.add_argument(
+        '--crop-padding',
+        type=float,
+        default=0.15,
+        metavar='FLOAT',
+        help='fractional padding added to each side of detection bbox when cropping (default: 0.15)',
+    )
+    parser.add_argument(
+        '--retry-errors',
+        action='store_true',
+        help='reset previously errored detection jobs to pending before classifying',
+    )
+    parser.add_argument(
+        '--reclassify-all',
+        action='store_true',
+        help='reset all detection jobs (done and error) to pending before classifying',
+    )
+    parser.set_defaults(handler=cmd_classify)
 
 
 def cmd_classify(args: argparse.Namespace) -> None:

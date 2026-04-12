@@ -1,5 +1,6 @@
 """Setup subcommand: configure crittercam and initialise the database."""
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -8,7 +9,20 @@ from crittercam.config import CONFIG_PATH, Config, load, save
 from crittercam.pipeline.db import connect, migrate
 
 
-def cmd_setup() -> None:
+def register(subparsers: argparse._SubParsersAction) -> None:
+    """Register the setup subcommand.
+
+    Args:
+        subparsers: the subparsers action from the root argument parser
+    """
+    parser = subparsers.add_parser(
+        'setup',
+        help='configure crittercam and initialise the database',
+    )
+    parser.set_defaults(handler=cmd_setup)
+
+
+def cmd_setup(args: argparse.Namespace | None = None) -> None:
     """Prompt for configuration values, write config, and initialise the database."""
     if CONFIG_PATH.exists():
         existing = load(CONFIG_PATH)

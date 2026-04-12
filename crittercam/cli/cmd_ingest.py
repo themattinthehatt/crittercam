@@ -2,10 +2,37 @@
 
 import argparse
 import sys
+from pathlib import Path
 
 from crittercam.config import CONFIG_PATH, Config, load
 from crittercam.pipeline.db import connect
 from crittercam.pipeline.ingest import ingest
+
+
+def register(subparsers: argparse._SubParsersAction) -> None:
+    """Register the ingest subcommand.
+
+    Args:
+        subparsers: the subparsers action from the root argument parser
+    """
+    parser = subparsers.add_parser(
+        'ingest',
+        help='ingest images from an SD card into the archive',
+    )
+    parser.add_argument(
+        '--source',
+        type=Path,
+        required=True,
+        metavar='PATH',
+        help='source directory containing images to ingest',
+    )
+    parser.add_argument(
+        '--data-root',
+        type=Path,
+        metavar='PATH',
+        help='override the data root from config',
+    )
+    parser.set_defaults(handler=cmd_ingest)
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
