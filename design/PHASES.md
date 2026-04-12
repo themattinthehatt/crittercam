@@ -75,7 +75,7 @@
 ---
 
 ## Phase 3 — Storage layer
-**Status**: In progress
+**Status**: Complete
 
 ### Scope
 - SQLite schema implementation (images, detections, processing_jobs)
@@ -99,14 +99,9 @@
       (raw image, thumbnail, crop) from disk; uses `LIKE '%;{leaf}'` to match against the
       leaf segment of the stored taxonomy string
 
-### Remaining
-- [ ] CSV / JSON export scripts
-
 ### Completion criteria
 - [x] Schema created from scratch by a single command
 - [x] Migrations apply cleanly to an existing database
-- [ ] All detections queryable by species, date, confidence
-- [ ] Full dataset exportable to CSV in one command
 
 ---
 
@@ -188,20 +183,40 @@
 ---
 
 ## Phase 5 — Individual re-identification
-**Status**: Not started
+**Status**: Design complete, not started
 
 ### Scope
-- Given detections of the same species, identify whether they depict the same individual
-- Build and maintain per-individual identity records linked to detection rows
-- Support manual confirmation and correction of identity assignments
+- For each detection crop, compute a MegaDescriptor-L-384 embedding and store
+  it as a `.npy` file in `derived/`, referenced by `detections.embedding_path`
+- Gallery-based nearest-neighbor matching assigns detections to individuals
+  using cosine similarity; a configurable threshold controls same/new decisions
+- Results stored in a new `individuals` table; `detections` gains FK and
+  assignment metadata columns
+- Human identity confirmations and corrections via the dashboard are permanent
+  anchors that survive model upgrades (see Decision 023)
+- Starting species: domestic cat
+
+### Resolved
+- Embedding model: MegaDescriptor-L-384 via `timm` + HuggingFace (Decision 021)
+- Embedding storage: `.npy` flat files in `derived/`, path in DB (Decision 022)
+- Matching strategy: gallery-based nearest-neighbor, not clustering (Decision 023)
+- Human assignments as upgrade anchors (Decision 023)
+- Schema: `individuals` table + 7 new columns on `detections` (Decision 024)
+- Migration: `0002_reid_schema.sql`
 
 ### Open questions
-- [ ] Which re-ID approach? (embedding similarity, dedicated re-ID model, manual clustering)
-- [ ] What species to target first? (deer and coyote are likely highest-volume)
-- [ ] How to represent identity in the DB — new `individuals` table, or field on `detections`?
-- [ ] Confidence threshold for automatic assignment vs. flagging for human review
+- [ ] Similarity threshold starting value (suggested 0.75; calibrate against
+      cat verification results)
+- [ ] Dashboard UI for confirming/correcting/splitting individual assignments
+      (Phase 4b / Phase 5b overlap)
+- [ ] `crittercam reid` CLI subcommand design (flags for threshold,
+      retry-errors, reclassify-all, species filter)
 
 ### Completion criteria
-- [ ] Detections of the same individual are linked across sessions
-- [ ] Identity assignments are queryable and correctable via the interface
-- [ ] Per-individual activity history is browsable
+- [ ] `crittercam reid` processes pending embedding jobs, writes `.npy` files,
+      runs gallery matching, and writes `individual_id` assignments
+- [ ] Re-running on the same dataset produces no duplicate assignments
+- [ ] A model upgrade re-run clears algorithm assignments, preserves human
+      assignments, and re-derives identities correctly
+- [ ] Detections of the same individual are linked across ingestion batches
+- [ ] Per-individual detection history is queryable by `individual_id`

@@ -608,4 +608,170 @@ crittercam/web/
 
 ---
 
+## 021 — MegaDescriptor chosen as Phase 5 re-identification embedding model
+
+**Date**: 2026-04-12
+**Decision**: Use MegaDescriptor (specifically `MegaDescriptor-L-384`) as the
+embedding model for individual re-identification in Phase 5
+
+**Considered**:
+- MiewID (Wild Me / Wildbook) — EfficientNetV2 trained on 49 species, 37k
+  individuals; stronger zero-shot performance than MegaDescriptor (~19% top-1
+  improvement on unseen species). Ruled out for now due to poor packaging: no
+  PyPI release, pinned transitive dependencies, setup.py-based install. Would
+  conflict with the project's dependency hygiene.
+- WildFusion — ensemble of MegaDescriptor global embeddings + local keypoint
+  matching (SuperPoint/ALIKED/DISK via GlueFactory). Best accuracy, but local
+  matching is a full keypoint correspondence problem run image-by-image, making
+  gallery search significantly more expensive than a dot product. Noted as an
+  upgrade path, not a first implementation.
+- CLIP / DINOv2 — general-purpose vision models; benchmarks show MegaDescriptor
+  outperforms both by a significant margin on animal re-ID datasets.
+- MegaDescriptor (chosen) — Swin transformer trained specifically on wildlife
+  re-ID datasets; available on HuggingFace; loaded via `timm` (already a
+  transitive dependency of the project); no new heavy dependencies.
+
+**Rationale**: MegaDescriptor's packaging story is uniquely clean for this
+project — `timm.create_model('hf-hub:BVRA/MegaDescriptor-L-384', num_classes=0,
+pretrained=True)` is the entire integration surface. PyTorch is already present
+from SpeciesNet. MiewID and WildFusion remain valid upgrade paths if accuracy
+proves insufficient on backyard species.
+
+**License**: CC BY-NC 4.0. Appropriate for personal, non-commercial use.
+Revisit before any commercial deployment.
+
+**Implications**:
+- `timm` is already available; no new dependencies required
+- Model weights download from HuggingFace on first run; can be pre-downloaded
+  for offline operation
+- The smaller `MegaDescriptor-S-224` variant is available if inference speed
+  becomes a concern on large batches
+- Starting species: domestic cat, chosen because distinguishable individuals
+  are already present in the initial dataset and provide an easy verification
+  baseline
+
+---
+
+## 022 — Embeddings stored as .npy files on disk, referenced by path
+
+**Date**: 2026-04-12
+**Decision**: Embedding vectors are stored as NumPy `.npy` files in the `derived/`
+tree and referenced by path in `detections.embedding_path`, not stored as
+BLOBs in SQLite
+
+**Considered**:
+- SQLite BLOB column — works for storage and retrieval by ID; an embedding
+  vector is small (~6 KB for MegaDescriptor-L at float32), so scale is not
+  a concern. However, BLOBs make the database harder to inspect and embeddings
+  harder to use directly from a notebook.
+- Flat files on disk, referenced by path (chosen) — consistent with Decision
+  006 (derived assets on disk, not in the DB). Embeddings are derived from
+  the detection crop, regenerable at any time, and naturally live alongside
+  the other derived assets.
+
+**Rationale**: Treating embeddings as derived assets rather than metadata is
+consistent with the project's principle that the database is an index, not a
+payload (Decision 006). A `.npy` file is directly usable from NumPy/PyTorch
+without any database query.
+
+**Directory structure** (mirroring Decision 006):
+derived/YYYY/MM/DD/<filename>_det001_emb.npy   # embedding for detection 1
+
+**Implications**:
+- `detections.embedding_path` stores the path relative to `data_root`,
+  following Decision 010
+- A `processing_jobs` row with `job_type='embedding'` tracks whether
+  embedding has been computed for each detection, following Decision 011
+- On a model upgrade, embedding files are regenerated and `embedding_path`
+  is updated; old files can be deleted once re-embedding is complete
+- `reid_model_name` and `reid_model_version` on `detections` record the
+  provenance of the embedding, not the identity assignment
+
+---
+
+## 023 — Gallery-based individual matching; human assignments as anchors
+
+**Date**: 2026-04-12
+**Decision**: Individual identity is assigned by gallery-based nearest-neighbor
+matching. Human-confirmed assignments are permanent anchors that survive model
+upgrades; algorithm assignments are discarded and re-derived on upgrade.
+
+**Considered**:
+- Clustering (re-cluster all embeddings at once) — appealing because it can
+  correct mistakes as new evidence accumulates. Ruled out as the primary
+  mechanism because identity labels shift on every re-cluster, complicating
+  the DB design and making human corrections harder to preserve.
+- Gallery-based matching (chosen) — incrementally match each new detection
+  against a growing gallery of known-individual embeddings using cosine
+  similarity. Simpler, naturally integrates with the existing batch pipeline
+  and `processing_jobs` tracking, and makes human corrections straightforwardly
+  durable.
+
+**Gallery-based matching mechanics**:
+1. For each detection without an `individual_id`, compute cosine similarity
+   against all gallery embeddings of the same species
+2. If the nearest neighbor exceeds a configurable threshold, assign that
+   `individual_id`; record similarity, model provenance, and timestamp
+3. If no neighbor exceeds the threshold, create a new `individuals` row and
+   assign it; `individual_similarity` is set to 1.0 as a sentinel (founding
+   detection, no match was made)
+4. Human-confirmed assignments (`individual_assigned_by = 'human'`) are always
+   included in the gallery and take precedence
+
+**Model upgrade policy**:
+- Algorithm-assigned detections (`individual_assigned_by = 'algorithm'`) have
+  their identity fields and embedding fields cleared and are re-processed with
+  the new model
+- Human-assigned detections (`individual_assigned_by = 'human'`) are untouched
+  and seed the new gallery as anchors
+- `individuals` rows whose only remaining detections are algorithm-assigned
+  become orphaned during the reset and are deleted before re-running
+- This policy means human review effort is never lost across model upgrades
+
+**Implications**:
+- A similarity threshold must be chosen and made configurable (suggested
+  starting value: 0.75, to be calibrated against cat verification results)
+- The dashboard needs a way to confirm, correct, or split individual
+  assignments (Phase 5b / Phase 4b overlap)
+- `individual_assigned_by` takes exactly two values: `'algorithm'` or
+  `'human'`; no other values are valid
+
+---
+
+## 024 — Schema for individual re-identification
+
+**Date**: 2026-04-12
+**Decision**: Phase 5 adds a new `individuals` table and seven new columns on
+`detections`, applied via migration 0002
+
+**`individuals` table**:
+- One row per identified individual animal
+- `species_leaf` is denormalized onto this table (rather than derived via join
+  through detections) for query simplicity and to handle individuals whose
+  detections have all been marked inactive
+- `nickname` is null until set interactively via the dashboard
+- `created_at` and `updated_at` track row creation and any subsequent changes
+  (nickname updates, merges)
+
+**New columns on `detections`**:
+- `embedding_path` — relative path to the `.npy` embedding file (Decision 022)
+- `reid_model_name`, `reid_model_version` — provenance of the embedding vector;
+  belong on `detections` rather than `individuals` because detections of the
+  same individual may be re-embedded with different model versions over time
+- `individual_id` — FK to `individuals`, nullable until assigned
+- `individual_similarity` — cosine similarity at assignment time; 1.0 sentinel
+  for founding detections; null for human assignments
+- `individual_assigned_by` — `'algorithm'` or `'human'`
+- `individual_assigned_at` — ISO 8601 timestamp of assignment
+
+**Rationale**: Keeping identity assignment fields on `detections` (rather than
+a join table) keeps queries simple — one join to `individuals` is sufficient
+for all foreseeable dashboard queries. The assignment metadata fields
+(`individual_similarity`, `individual_assigned_by`, `individual_assigned_at`)
+make the audit trail and model-upgrade policy (Decision 023) enforceable
+entirely through SQL.
+
+---
+
 <!-- Add new decisions below this line, incrementing the number -->
+
