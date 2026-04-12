@@ -93,6 +93,12 @@
 - [x] Migration runner (`pipeline/db.py`) — applies pending migrations in order, idempotent
 - [x] `crittercam setup` runs migrations on first run and on re-run
 
+### Done
+- [x] `crittercam clean-db --labels <leaf> [<leaf> ...] [--dry-run]` — removes matching
+      detections and their parent images from the database and deletes all associated files
+      (raw image, thumbnail, crop) from disk; uses `LIKE '%;{leaf}'` to match against the
+      leaf segment of the stored taxonomy string
+
 ### Remaining
 - [ ] CSV / JSON export scripts
 
@@ -105,7 +111,7 @@
 ---
 
 ## Phase 4 — Review & query interface
-**Status**: In progress (Home, Browse, and Analytics tabs complete; CLI integration remaining)
+**Status**: Phase 4a complete
 
 ### Scope
 - Local web dashboard served by FastAPI + Uvicorn (Python backend) and React + Vite
@@ -167,13 +173,14 @@
 - [x] `FilterBar` component — controlled species dropdown and date range inputs
 - [x] `DetailPanel` component — crop + full image with SVG bounding box overlay, metadata
 
-### Remaining
-- [ ] `crittercam serve` CLI command — starts Uvicorn, opens browser
-- [ ] `crittercam build-ui` — runs `npm run build`, production static file serving
+### Done (continued)
+- [x] `crittercam serve [--port PORT]` — loads config, warns if UI not built, opens browser,
+      starts Uvicorn; serves built React app via StaticFiles mount when `dist/` is present
+- [x] `crittercam build-ui` — runs `npm run build` inside `crittercam/web/ui/`
 
 ### Completion criteria (Phase 4a)
-- [ ] `crittercam build-ui` compiles the React app without errors
-- [ ] `crittercam serve` starts the dashboard; browser shows Home tab with live data
+- [x] `crittercam build-ui` compiles the React app without errors
+- [x] `crittercam serve` starts the dashboard; browser shows Home tab with live data
 - [x] Browse tab shows detection crops; species and date filters narrow results correctly
 - [x] Detail panel shows crop + full image with bounding box for any detection
 - [x] Analytics tab shows weekly detections per species line chart

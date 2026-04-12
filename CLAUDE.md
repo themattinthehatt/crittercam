@@ -113,6 +113,20 @@ foo(
 - Pass parameters as a dict: `conn.execute('... WHERE id = :id', {'id': row_id})`
 - Positional `?` is only acceptable for single-parameter queries where the mapping is unambiguous
 
+### Detection label format
+- Labels in the `detections` table are stored as a semicolon-delimited taxonomy string:
+  `<uuid>;<kingdom>;<phylum>;<class>;<order>;<family>;<genus>;<species>`
+  e.g. `abc123;animalia;chordata;mammalia;carnivora;canidae;canis;canis latrans`
+- Special categories (e.g. blank frames) follow the same format:
+  `abc123;;;;;blank`
+- **Never match labels with direct equality or `IN (...)` against a plain name.**
+  Always match against the leaf (final segment) using `LIKE '%;{leaf}'`:
+  ```python
+  params[f'labellike{i}'] = f'%;{label}'
+  conditions.append(f'd.label LIKE :labellike{i}')
+  ```
+- The leaf is the only part exposed to users (e.g. via CLI `--labels human blank`)
+
 ### Derived assets
 - Derived assets (thumbnails, detection crops) are written to disk and referenced by path in the DB — never stored as BLOBs
 - Directory structure mirrors the image archive:
@@ -221,20 +235,53 @@ crittercam/
 │   └── DECISIONS.md
 ├── CLAUDE.md
 ├── crittercam/
-│   ├── cli.py
+│   ├── cli/
+│   │   ├── main.py           # discovers and registers all cmd_*.py modules
+│   │   ├── _geo.py
+│   │   ├── cmd_setup.py
+│   │   ├── cmd_ingest.py
+│   │   ├── cmd_classify.py
+│   │   ├── cmd_serve.py
+│   │   ├── cmd_build_ui.py
+│   │   └── cmd_clean_db.py
 │   ├── config.py
-│   ├── pipeline/       # ingestion + processing code
-│   ├── classifier/     # swappable classifier modules
-│   └── web/            # dashboard interface
-└── tests/
-    ├── test_cli.py
+│   ├── pipeline/
+│   │   ├── db.py
+│   │   ├── exif.py
+│   │   ├── ingest.py
+│   │   ├── classify.py
+│   │   ├── clean.py
+│   │   └── migrations/
+│   ├── classifier/
+│   │   ├── base.py
+│   │   └── speciesnet.py
+│   └── web/
+│       ├── api/
+│       │   ├── __init__.py
+│       │   ├── detections.py
+│       │   └── stats.py
+│       ├── ui/               # React + Vite frontend
+│       └── server.py
+└── tests/                    # mirrors crittercam/ structure exactly
     ├── test_config.py
-    └── pipeline/       # mirrors crittercam/pipeline/
-        ├── assets/     # sample images and other test fixtures
+    ├── cli/
+    │   ├── test_cmd_setup.py
+    │   ├── test_cmd_ingest.py
+    │   ├── test_cmd_classify.py
+    │   ├── test_cmd_serve.py
+    │   ├── test_cmd_build_ui.py
+    │   ├── test_cmd_clean_db.py
+    │   └── test_geo.py
+    ├── classifier/
+    │   └── test_speciesnet.py
+    └── pipeline/
+        ├── assets/
         ├── conftest.py
         ├── test_db.py
         ├── test_exif.py
-        └── test_ingest.py
+        ├── test_ingest.py
+        ├── test_classify.py
+        └── test_clean.py
 ```
 
 ### File Naming

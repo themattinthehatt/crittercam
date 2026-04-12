@@ -108,18 +108,21 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 ├── Procfile.dev                     # runs Uvicorn + Vite simultaneously in dev
 ├── crittercam/
 │   ├── cli/                         # entry point: `crittercam` command
-│   │   ├── main.py                  # argument parser + dispatch
+│   │   ├── main.py                  # auto-discovers and registers all cmd_*.py modules
 │   │   ├── _geo.py                  # country/admin1 validation + prompts
 │   │   ├── cmd_setup.py             # `crittercam setup`
 │   │   ├── cmd_ingest.py            # `crittercam ingest`
 │   │   ├── cmd_classify.py          # `crittercam classify`
-│   │   └── cmd_serve.py             # `crittercam serve` and `crittercam build-ui`
+│   │   ├── cmd_serve.py             # `crittercam serve`
+│   │   ├── cmd_build_ui.py          # `crittercam build-ui`
+│   │   └── cmd_clean_db.py          # `crittercam clean-db`
 │   ├── config.py                    # config load/save (~/.config/crittercam/config.toml)
 │   ├── pipeline/
 │   │   ├── db.py                    # connection + migration runner
 │   │   ├── exif.py                  # EXIF extraction (Browning camera support)
 │   │   ├── ingest.py                # Phase 1 ingestion + thumbnail generation
 │   │   ├── classify.py              # Phase 2 classification + crop generation
+│   │   ├── clean.py                 # detection/image removal (clean-db command)
 │   │   └── migrations/
 │   │       └── 0001_initial_schema.sql
 │   ├── classifier/
@@ -225,6 +228,22 @@ CREATE TABLE detections (
     corrected_at  TEXT
 );
 ```
+
+#### Detection label format
+
+The `label` column stores the full SpeciesNet taxonomy string, not just the species name:
+
+```
+<uuid>;<kingdom>;<phylum>;<class>;<order>;<family>;<genus>;<species leaf>
+```
+
+Example: `abc123;animalia;chordata;mammalia;carnivora;canidae;canis;canis latrans`
+
+Special categories follow the same pattern with empty intermediate segments:
+`abc123;;;;;blank`
+
+The leaf name (final segment after the last `;`) is the only part shown to users.
+SQL queries that filter by label must use `LIKE '%;{leaf}'` — never plain equality or `IN`.
 
 ### processing_jobs
 One row per (subject, algorithm). Tracks pipeline state; results live in their own
