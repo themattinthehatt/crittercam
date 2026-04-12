@@ -44,8 +44,8 @@ def mock_classify_stack(tmp_path, monkeypatch):
             patch('crittercam.cli.cmd_classify.connect', return_value=mock_conn), \
             patch('crittercam.classifier.speciesnet.SpeciesNetAdapter') as mock_adapter_cls, \
             patch('crittercam.pipeline.classify.classify_pending', return_value=mock_summary), \
-            patch('crittercam.pipeline.classify.reset_errors', return_value=0), \
-            patch('crittercam.pipeline.classify.reset_all', return_value=0):
+            patch('crittercam.pipeline.db.reset_errors', return_value=0), \
+            patch('crittercam.pipeline.db.reset_all', return_value=0):
         yield {
             'config': config,
             'conn': mock_conn,
@@ -115,18 +115,18 @@ class TestCmdClassifyResetFlags:
     """Test --retry-errors and --reclassify-all flags."""
 
     def test_retry_errors_calls_reset_errors(self, mock_classify_stack):
-        with patch('crittercam.pipeline.classify.reset_errors', return_value=2) as mock_reset:
+        with patch('crittercam.pipeline.db.reset_errors', return_value=2) as mock_reset:
             cmd_classify(_args(retry_errors=True))
         mock_reset.assert_called_once()
 
     def test_reclassify_all_calls_reset_all(self, mock_classify_stack):
-        with patch('crittercam.pipeline.classify.reset_all', return_value=5) as mock_reset:
+        with patch('crittercam.pipeline.db.reset_all', return_value=5) as mock_reset:
             cmd_classify(_args(reclassify_all=True))
         mock_reset.assert_called_once()
 
     def test_reclassify_all_takes_precedence_over_retry_errors(self, mock_classify_stack):
-        with patch('crittercam.pipeline.classify.reset_all', return_value=1) as mock_all, \
-                patch('crittercam.pipeline.classify.reset_errors', return_value=0) as mock_err:
+        with patch('crittercam.pipeline.db.reset_all', return_value=1) as mock_all, \
+                patch('crittercam.pipeline.db.reset_errors', return_value=0) as mock_err:
             cmd_classify(_args(reclassify_all=True, retry_errors=True))
         mock_all.assert_called_once()
         mock_err.assert_not_called()

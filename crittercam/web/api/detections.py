@@ -191,9 +191,11 @@ def get_detection(detection_id: int) -> dict:
         '''
         SELECT d.id, d.label, d.confidence, d.crop_path,
                d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
+               d.individual_id, ind.nickname,
                i.path AS image_path, i.captured_at, i.temperature_c
         FROM detections d
         JOIN images i ON i.id = d.image_id
+        LEFT JOIN individuals ind ON ind.id = d.individual_id
         WHERE d.id = :id
           AND d.is_active = 1
           AND d.crop_path IS NOT NULL
@@ -250,6 +252,8 @@ def get_detection(detection_id: int) -> dict:
         'bbox': bbox,
         'captured_at': row['captured_at'],
         'temperature_c': row['temperature_c'],
+        'individual_id': row['individual_id'],
+        'nickname': row['nickname'],
         'prev_id': prev_row['id'] if prev_row else None,
         'next_id': next_row['id'] if next_row else None,
     }

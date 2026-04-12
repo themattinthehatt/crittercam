@@ -62,7 +62,8 @@ def cmd_classify(args: argparse.Namespace) -> None:
         args: parsed command-line arguments
     """
     from crittercam.classifier.speciesnet import SpeciesNetAdapter
-    from crittercam.pipeline.classify import classify_pending, reset_all, reset_errors
+    from crittercam.pipeline.classify import classify_pending
+    from crittercam.pipeline.db import reset_all, reset_errors
 
     try:
         config = load(CONFIG_PATH)
@@ -87,11 +88,11 @@ def cmd_classify(args: argparse.Namespace) -> None:
 
     conn = connect(config.db_path)
     if args.reclassify_all:
-        n = reset_all(conn)
+        n = reset_all(conn, job_type='detection')
         if n:
             print(f'Reset {n} job(s) to pending for full reclassification.')
     elif args.retry_errors:
-        n = reset_errors(conn)
+        n = reset_errors(conn, job_type='detection')
         if n:
             print(f'Reset {n} errored job(s) to pending.')
     try:

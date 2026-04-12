@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from crittercam.classifier.base import Detection
-from crittercam.pipeline.classify import _generate_crop, classify_pending, reset_all, reset_errors
+from crittercam.pipeline.classify import _generate_crop, classify_pending
+from crittercam.pipeline.db import reset_all, reset_errors
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +244,7 @@ class TestResetErrors:
         db.commit()
 
         # Act
-        n = reset_errors(db)
+        n = reset_errors(db, job_type='detection')
 
         # Assert
         assert n == 1
@@ -264,7 +265,7 @@ class TestResetErrors:
         db.commit()
 
         # Act
-        n = reset_errors(db)
+        n = reset_errors(db, job_type='detection')
 
         # Assert
         assert n == 0
@@ -294,7 +295,7 @@ class TestResetErrors:
             db.commit()
 
         # Act
-        n = reset_errors(db)
+        n = reset_errors(db, job_type='detection')
 
         # Assert
         assert n == 2
@@ -312,7 +313,7 @@ class TestResetAll:
         db.commit()
 
         # Act
-        n = reset_all(db)
+        n = reset_all(db, job_type='detection')
 
         # Assert
         assert n == 1
@@ -333,7 +334,7 @@ class TestResetAll:
         db.commit()
 
         # Act
-        n = reset_all(db)
+        n = reset_all(db, job_type='detection')
 
         # Assert
         assert n == 1
@@ -345,7 +346,7 @@ class TestResetAll:
         # Arrange — job is already pending (default from fixture)
 
         # Act
-        n = reset_all(db)
+        n = reset_all(db, job_type='detection')
 
         # Assert
         assert n == 0
@@ -369,7 +370,7 @@ class TestResetAll:
             db.commit()
 
         # Act
-        n = reset_all(db)
+        n = reset_all(db, job_type='detection')
 
         # Assert
         assert n == 2

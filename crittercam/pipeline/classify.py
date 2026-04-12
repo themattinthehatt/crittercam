@@ -3,12 +3,12 @@
 import logging
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image
 
 from crittercam.classifier.base import Classifier, Detection
+from crittercam.pipeline.db import mark_job, now
 
 logger = logging.getLogger(__name__)
 
@@ -24,42 +24,6 @@ class ClassifySummary:
 
     classified: int = 0
     errors: dict[str, str] = field(default_factory=dict)
-
-
-def reset_errors(conn: sqlite3.Connection) -> int:
-    """Reset all errored detection jobs back to pending so they will be retried.
-
-    Args:
-        conn: open database connection
-
-    Returns:
-        number of jobs reset
-    """
-    cursor = conn.execute(
-        "UPDATE processing_jobs SET status = 'pending', started_at = NULL, "
-        "completed_at = NULL, error_msg = NULL "
-        "WHERE job_type = 'detection' AND status = 'error'"
-    )
-    conn.commit()
-    return cursor.rowcount
-
-
-def reset_all(conn: sqlite3.Connection) -> int:
-    """Reset all detection jobs (done and error) back to pending for a full rerun.
-
-    Args:
-        conn: open database connection
-
-    Returns:
-        number of jobs reset
-    """
-    cursor = conn.execute(
-        "UPDATE processing_jobs SET status = 'pending', started_at = NULL, "
-        "completed_at = NULL, error_msg = NULL "
-        "WHERE job_type = 'detection' AND status IN ('done', 'error')"
-    )
-    conn.commit()
-    return cursor.rowcount
 
 
 def classify_pending(
@@ -105,7 +69,7 @@ def classify_pending(
         image_path = data_root / job['path']
         filename = job['filename']
 
-        _mark_job(conn, job_id, status='running', started_at=_now())
+        mark_job(conn, job_id, status='running', started_at=now())
         conn.commit()
 
         try:
@@ -120,12 +84,12 @@ def classify_pending(
         except Exception as exc:
             msg = str(exc)
             logger.error(f'classify failed on {filename}: {msg}')
-            _mark_job(conn, job_id, 'error', completed_at=_now(), error_msg=msg)
+            mark_job(conn, job_id, 'error', completed_at=now(), error_msg=msg)
             conn.commit()
             summary.errors[filename] = msg
             continue
 
-        now = _now()
+        ts = now()
 
         conn.execute(
             'UPDATE detections SET is_active = 0 WHERE image_id = :image_id AND is_active = 1',
@@ -156,11 +120,11 @@ def classify_pending(
                     'crop_path': str(crop_rel) if crop_rel else None,
                     'model_name': classifier.model_name,
                     'model_version': classifier.model_version,
-                    'created_at': now,
+                    'created_at': ts,
                 },
             )
 
-        _mark_job(conn, job_id, 'done', completed_at=now)
+        mark_job(conn, job_id, 'done', completed_at=ts)
         conn.commit()
 
         summary.classified += 1
@@ -214,40 +178,3 @@ def _generate_crop(
     crop_abs = derived_dir / f'{stem}_det001.jpg'
     crop.save(crop_abs, format='JPEG', quality=85)
     return crop_abs.relative_to(data_root)
-
-
-def _now() -> str:
-    """Return current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat(timespec='seconds')
-
-
-def _mark_job(
-    conn: sqlite3.Connection,
-    job_id: int,
-    status: str,
-    started_at: str | None = None,
-    completed_at: str | None = None,
-    error_msg: str | None = None,
-) -> None:
-    """Update a processing_job row's status and timestamps.
-
-    Args:
-        conn: open database connection
-        job_id: primary key of the job row
-        status: new status value ('running', 'done', 'error')
-        started_at: ISO 8601 timestamp to set, or None to leave unchanged
-        completed_at: ISO 8601 timestamp to set, or None to leave unchanged
-        error_msg: error message to set, or None to leave unchanged
-    """
-    conn.execute(
-        '''
-        UPDATE processing_jobs
-        SET status       = :status,
-            started_at   = COALESCE(:started_at, started_at),
-            completed_at = COALESCE(:completed_at, completed_at),
-            error_msg    = COALESCE(:error_msg, error_msg)
-        WHERE id = :job_id
-        ''',
-        {'status': status, 'started_at': started_at, 'completed_at': completed_at,
-         'error_msg': error_msg, 'job_id': job_id},
-    )

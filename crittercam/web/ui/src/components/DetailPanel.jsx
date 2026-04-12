@@ -73,6 +73,20 @@ export default function DetailPanel({ detectionId, onClose }) {
             <span className="meta-value">{detection.temperature_c}°C</span>
           </div>
         )}
+        {detection.individual_id !== null && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <div className="meta-row">
+              <span className="meta-label">individual</span>
+              <span className="meta-value">#{detection.individual_id}</span>
+            </div>
+            {detection.nickname !== null && (
+              <div className="meta-row">
+                <span className="meta-label">nickname</span>
+                <span className="meta-value">{detection.nickname}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
