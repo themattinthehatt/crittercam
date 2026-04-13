@@ -183,7 +183,7 @@
 ---
 
 ## Phase 5 — Individual re-identification
-**Status**: Design complete, not started
+**Status**: Core implementation complete; annotation UI deferred to Phase 5b
 
 ### Scope
 - For each detection crop, compute a MegaDescriptor-L-384 embedding and store
@@ -192,8 +192,8 @@
   using cosine similarity; a configurable threshold controls same/new decisions
 - Results stored in a new `individuals` table; `detections` gains FK and
   assignment metadata columns
-- Human identity confirmations and corrections via the dashboard are permanent
-  anchors that survive model upgrades (see Decision 023)
+- Human identity confirmations and corrections are permanent anchors that
+  survive model upgrades (see Decision 023)
 - Starting species: domestic cat
 
 ### Resolved
@@ -203,20 +203,57 @@
 - Human assignments as upgrade anchors (Decision 023)
 - Schema: `individuals` table + 7 new columns on `detections` (Decision 024)
 - Migration: `0002_reid_schema.sql`
+- Similarity threshold: 0.5 (calibrated against domestic cat verification results;
+  Decision 025)
 
 ### Open questions
-- [ ] Similarity threshold starting value (suggested 0.75; calibrate against
-      cat verification results)
 - [ ] Dashboard UI for confirming/correcting/splitting individual assignments
-      (Phase 4b / Phase 5b overlap)
-- [ ] `crittercam reid` CLI subcommand design (flags for threshold,
-      retry-errors, reclassify-all, species filter)
+      (Phase 5b / Phase 4b overlap)
+
+### Done
+- [x] `Identifier` Protocol + `Embedding` dataclass (`identifier/base.py`)
+- [x] `MegaDescriptorAdapter` wrapping MegaDescriptor-L-384 via `timm`
+      (`identifier/megadescriptor.py`)
+- [x] `enqueue_pending()` — scans active detections with a crop but no embedding
+      job and inserts pending `processing_jobs` rows
+- [x] `identify_pending()` — Phase 1: runs identifier on pending jobs, writes
+      `.npy` files, records `embedding_path` and reid model provenance on
+      `detections`; Phase 2: delegates to `match_pending()`
+- [x] `match_pending()` — standalone gallery matching for embedded-but-unassigned
+      detections; vectorized per-species matrix multiply; in-memory gallery update
+      within a run; used by `--skip-embedding` to re-match without re-embedding
+- [x] `reset_assignments()` — clears algorithm identity fields only (preserves
+      embeddings); deletes orphaned individuals; used before `match_pending()` when
+      exploring threshold values
+- [x] `reidentify_all()` — full reset: clears embeddings + identity, deletes
+      orphaned individuals, resets embedding jobs to pending
+- [x] `merge_individuals()` — merges a set of individuals into the lowest id,
+      reassigns all detections as human-assigned, deletes non-target individual rows
+      (Decision 026)
+- [x] `name_individual()` — sets or updates the nickname on an individual row
+- [x] `_next_individual_id()` — gap-filling helper: finds the lowest positive
+      integer id not currently in use, so individual ids restart from 1 after a
+      reset rather than continuing from the historical maximum
+- [x] `crittercam identify` — `--species`, `--threshold` (default 0.5),
+      `--retry-errors`, `--reidentify-all`, `--skip-embedding`
+- [x] `crittercam merge-individuals ID [ID ...]` — merges individuals into the
+      lowest id; marks all reassigned detections as human-assigned
+- [x] `crittercam name-individual ID NICKNAME` — assigns a display name to an
+      individual
+- [x] `GET /api/individuals` — list of individuals with at least one active crop
+- [x] `individual_id` filter on `GET /api/detections`
+- [x] `GET /api/detections` response includes `individual_id` and `nickname`
+- [x] Browse tab: "browse by" mode selector (species or individual) with shared
+      date range filter; individual dropdown shows nickname or `#id`
+- [x] Browse grid: cell label shows nickname / `#id` when individual is assigned,
+      species name otherwise
+- [x] `DetailPanel`: shows `individual` id and `nickname` when assigned
 
 ### Completion criteria
-- [ ] `crittercam reid` processes pending embedding jobs, writes `.npy` files,
+- [x] `crittercam identify` processes pending embedding jobs, writes `.npy` files,
       runs gallery matching, and writes `individual_id` assignments
-- [ ] Re-running on the same dataset produces no duplicate assignments
-- [ ] A model upgrade re-run clears algorithm assignments, preserves human
+- [x] Re-running on the same dataset produces no duplicate assignments
+- [x] A model upgrade re-run clears algorithm assignments, preserves human
       assignments, and re-derives identities correctly
-- [ ] Detections of the same individual are linked across ingestion batches
-- [ ] Per-individual detection history is queryable by `individual_id`
+- [x] Detections of the same individual are linked across ingestion batches
+- [x] Per-individual detection history is queryable by `individual_id`

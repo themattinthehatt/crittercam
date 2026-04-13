@@ -729,8 +729,8 @@ upgrades; algorithm assignments are discarded and re-derived on upgrade.
 - This policy means human review effort is never lost across model upgrades
 
 **Implications**:
-- A similarity threshold must be chosen and made configurable (suggested
-  starting value: 0.75, to be calibrated against cat verification results)
+- A similarity threshold must be chosen and made configurable; default is 0.5
+  (calibrated against domestic cat results — see Decision 025)
 - The dashboard needs a way to confirm, correct, or split individual
   assignments (Phase 5b / Phase 4b overlap)
 - `individual_assigned_by` takes exactly two values: `'algorithm'` or
@@ -770,6 +770,70 @@ for all foreseeable dashboard queries. The assignment metadata fields
 (`individual_similarity`, `individual_assigned_by`, `individual_assigned_at`)
 make the audit trail and model-upgrade policy (Decision 023) enforceable
 entirely through SQL.
+
+---
+
+## 025 — Similarity threshold calibrated to 0.5 for domestic cat
+
+**Date**: 2026-04-12
+**Decision**: The default cosine similarity threshold for individual re-identification is
+set to 0.5, down from the 0.75 starting estimate in Decision 023.
+
+**Rationale**: Empirical verification against domestic cat detections showed that 0.75
+produced excessive fragmentation — individuals seen in different lighting conditions
+(day vs. night IR) were assigned different IDs despite being visually the same animal.
+At 0.5, known same-individual pairs matched correctly while distinct individuals
+remained separated.
+
+**How to change it**: The threshold is configurable via `--threshold` on `crittercam
+identify` and `crittercam identify --skip-embedding`. Re-matching without re-embedding
+(`--skip-embedding`) enables cheap threshold experimentation: human-confirmed assignments
+(`individual_assigned_by = 'human'`) are preserved as gallery anchors across resets, so
+human review effort is never lost when exploring threshold values.
+
+**Implications**:
+- `crittercam identify` defaults to `--threshold 0.5`
+- The threshold chosen during initial calibration is appropriate for domestic cats in
+  this deployment; a different species or camera setup may warrant recalibration
+- The workflow for recalibration is: confirm a small set of obvious same-individual pairs
+  via `crittercam merge-individuals`, then run `crittercam identify --skip-embedding
+  --threshold <candidate>` with varying values until the result looks correct
+
+---
+
+## 026 — merge-individuals marks all reassigned detections as human-assigned
+
+**Date**: 2026-04-12
+**Decision**: `crittercam merge-individuals ID [ID ...]` merges a set of individual IDs
+into the lowest in the set. All detections reassigned to the surviving individual are
+written with `individual_assigned_by = 'human'`, regardless of their prior assignment
+source.
+
+**Rationale**: A merge is a deliberate human correction — the user has looked at multiple
+identified individuals and determined they are the same animal. Preserving the original
+`'algorithm'` assignment source on the merged detections would allow a future
+`reset_assignments` + `match_pending` run to discard the merge and reassign them
+differently, undoing the human decision. Marking them `'human'` makes the merge permanent
+— merged detections become anchors in every future gallery run, just like any other
+human-confirmed assignment (Decision 023).
+
+**Side effect on gallery richness**: Merging day-shot and night-IR crops of the same
+animal into one individual expands that individual's gallery entries. Since gallery
+matching uses the maximum cosine similarity over all gallery embeddings for an individual,
+a richer gallery (more diverse lighting and pose examples) increases the probability that
+future detections of that animal will exceed the threshold and be correctly assigned.
+
+**CLI syntax**:
+```
+crittercam merge-individuals ID [ID ...]   # merges all into the lowest ID
+```
+
+**Implications**:
+- Merges cannot be undone via `reset_assignments` — the merged detections are protected
+  by their `individual_assigned_by = 'human'` status
+- Non-surviving `individuals` rows (all except the lowest ID) are deleted after
+  detections are reassigned
+- The surviving individual's `updated_at` timestamp is refreshed after the merge
 
 ---
 

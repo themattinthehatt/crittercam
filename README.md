@@ -1,6 +1,6 @@
 ![](assets/crittercam_banner.png)
 
-Backyard wildlife camera trap pipeline for ingestion, species identification, and local dashboard.
+Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.
 
 This is a fun DIY project - for serious camera trap software, see [AddaxAI](https://addaxdatascience.com/addaxai/).
 
@@ -115,6 +115,50 @@ Each image produces:
 
 ```bash
 crittercam classify --country USA --admin1-region CT --crop-padding 0.20
+```
+
+### Re-identify individuals
+
+After classifying, run individual re-identification on all pending detections:
+
+```bash
+crittercam identify
+```
+
+On first run, MegaDescriptor-L-384 weights will download automatically from HuggingFace (~1.5 GB).
+Subsequent runs use the cached weights.
+
+For each detection crop, this computes an embedding vector and uses gallery-based nearest-neighbor
+matching (cosine similarity) to assign detections to known individuals. New individuals are created
+when no gallery match exceeds the threshold.
+
+To target a single species:
+
+```bash
+crittercam identify --species "domestic cat"
+```
+
+To experiment with the similarity threshold without re-computing embeddings (fast — skips the model
+entirely and just re-runs the matching step):
+
+```bash
+crittercam identify --skip-embedding --threshold 0.6
+```
+
+The default threshold is `0.5`, calibrated on domestic cat detections. Human-confirmed assignments
+(merges, name corrections) are preserved as gallery anchors across re-matching runs.
+
+**Merge individuals** that the algorithm split incorrectly — all reassigned detections are marked as
+human-confirmed and will survive future re-matching:
+
+```bash
+crittercam merge-individuals 3 7 12   # merges #7 and #12 into #3 (the lowest id)
+```
+
+**Name an individual** to give it a display nickname in the dashboard:
+
+```bash
+crittercam name-individual 3 "Mittens"
 ```
 
 ### Run the dashboard

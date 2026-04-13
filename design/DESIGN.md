@@ -27,12 +27,16 @@ The system has a clean physical boundary:
 - **Field side**: camera trap writes JPEGs to SD card
 - **Processing side**: laptop runs the full pipeline when triggered
 
-### Four-phase pipeline
+### Five-phase pipeline
 
 ```
 [Camera trap] --(SD card)--> [Ingestion] --> [Processing] --> [Storage] --> [Interface]
                                                     ^                            |
                                                     |______ correction loop _____|
+                                                    |
+                                             [Re-identification]
+                                       (MegaDescriptor embeddings +
+                                        gallery nearest-neighbor matching)
 ```
 
 ### Phase 1 — Ingestion
@@ -67,6 +71,19 @@ The system has a clean physical boundary:
 - In production: React app is compiled once by `crittercam build-ui`; `crittercam serve`
   starts a single Uvicorn process that serves both the API and the built static files
 
+### Phase 5 — Individual re-identification
+- For each detection crop, compute a MegaDescriptor-L-384 embedding and store it as a
+  `.npy` file in `derived/`, referenced by `detections.embedding_path`
+- Gallery-based nearest-neighbor matching (cosine similarity) assigns detections to
+  individuals; threshold default 0.5 (calibrated on domestic cat; see Decision 025)
+- Human confirmations and merges become permanent gallery anchors that survive model
+  upgrades (see Decisions 023, 026)
+- Results stored in `individuals` table; `detections` gains FK + assignment metadata
+- `crittercam identify` — compute embeddings and run gallery matching; `--skip-embedding`
+  re-runs matching only (for threshold experimentation without re-embedding)
+- `crittercam merge-individuals` — merge two or more individuals into one (Decision 026)
+- `crittercam name-individual` — assign a display nickname to an individual
+
 ## Technology Choices
 
 | Component | Choice | Status |
@@ -80,6 +97,7 @@ The system has a clean physical boundary:
 | API framework | FastAPI + Uvicorn | Decided |
 | Frontend framework | React + Vite | Decided |
 | Chart library | Recharts | Decided |
+| Re-ID model | MegaDescriptor-L-384 (`timm`) | Decided |
 
 ## Storage Layout
 
@@ -113,6 +131,9 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   ├── cmd_setup.py             # `crittercam setup`
 │   │   ├── cmd_ingest.py            # `crittercam ingest`
 │   │   ├── cmd_classify.py          # `crittercam classify`
+│   │   ├── cmd_identify.py          # `crittercam identify`
+│   │   ├── cmd_merge_individuals.py # `crittercam merge-individuals`
+│   │   ├── cmd_name_individual.py   # `crittercam name-individual`
 │   │   ├── cmd_serve.py             # `crittercam serve`
 │   │   ├── cmd_build_ui.py          # `crittercam build-ui`
 │   │   └── cmd_clean_db.py          # `crittercam clean-db`
@@ -122,16 +143,22 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   ├── exif.py                  # EXIF extraction (Browning camera support)
 │   │   ├── ingest.py                # Phase 1 ingestion + thumbnail generation
 │   │   ├── classify.py              # Phase 2 classification + crop generation
+│   │   ├── identify.py              # Phase 5 re-identification (embed + match)
 │   │   ├── clean.py                 # detection/image removal (clean-db command)
 │   │   └── migrations/
-│   │       └── 0001_initial_schema.sql
+│   │       ├── 0001_initial_schema.sql
+│   │       └── 0002_reid_schema.sql # individuals table + reid columns on detections
 │   ├── classifier/
 │   │   ├── base.py                  # Detection dataclass + Classifier Protocol
 │   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
+│   ├── identifier/
+│   │   ├── base.py                  # Embedding dataclass + Identifier Protocol
+│   │   └── megadescriptor.py        # MegaDescriptor-L-384 adapter (timm + HuggingFace)
 │   └── web/                         # Phase 4 dashboard
 │       ├── api/                     # FastAPI route modules
 │       │   ├── __init__.py          # shared get_conn() helper
-│       │   ├── detections.py        # GET /api/detections, /api/detections/recent_by_species, /api/detections/{id}, /api/species
+│       │   ├── detections.py        # GET /api/detections, /api/detections/recent_by_species,
+│       │   │                        #     /api/detections/{id}, /api/species, /api/individuals
 │       │   └── stats.py             # GET /api/stats/summary, /api/stats/detections_over_time
 │       ├── ui/                      # React app (Vite)
 │       │   ├── src/
@@ -139,8 +166,8 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │       │   │   │   ├── StatsBar.jsx           # summary statistics
 │       │   │   │   ├── RecentBySpecies.jsx    # most recent crop per species (Home tab)
 │       │   │   │   ├── DetectionsOverTime.jsx # weekly line chart (Analytics tab)
-│       │   │   │   ├── DetectionGrid.jsx      # paginated thumbnail grid with filters
-│       │   │   │   ├── FilterBar.jsx          # species dropdown + date range inputs
+│       │   │   │   ├── DetectionGrid.jsx      # paginated grid; browse by species or individual
+│       │   │   │   ├── FilterBar.jsx          # mode selector, species/individual dropdown, date range
 │       │   │   │   └── DetailPanel.jsx        # crop + full image with SVG bbox overlay
 │       │   │   ├── App.jsx
 │       │   │   ├── App.css
@@ -155,6 +182,9 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   ├── test_cmd_setup.py
 │   │   ├── test_cmd_ingest.py
 │   │   ├── test_cmd_classify.py
+│   │   ├── test_cmd_identify.py
+│   │   ├── test_cmd_merge_individuals.py
+│   │   ├── test_cmd_name_individual.py
 │   │   ├── test_geo.py
 │   │   └── test_cmd_serve.py
 │   ├── classifier/
@@ -165,6 +195,7 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │       ├── test_classify.py
 │       ├── test_db.py
 │       ├── test_exif.py
+│       ├── test_identify.py
 │       └── test_ingest.py
 ├── pyproject.toml
 └── README.md
@@ -211,23 +242,45 @@ One row per animal per image, per model run.
 
 ```sql
 CREATE TABLE detections (
-    id            INTEGER PRIMARY KEY,
-    image_id      INTEGER NOT NULL REFERENCES images(id),
-    label         TEXT NOT NULL,
-    confidence    REAL NOT NULL,
-    bbox_x        REAL,                 -- normalized (x, y, w, h) in [0, 1]
-    bbox_y        REAL,
-    bbox_w        REAL,
-    bbox_h        REAL,
-    crop_path     TEXT,                 -- relative to data_root
-    model_name    TEXT NOT NULL,
-    model_version TEXT,
-    is_active     INTEGER NOT NULL DEFAULT 1,
-    created_at    TEXT NOT NULL,
-    human_label   TEXT,
-    corrected_at  TEXT
+    id                       INTEGER PRIMARY KEY,
+    image_id                 INTEGER NOT NULL REFERENCES images(id),
+    label                    TEXT NOT NULL,
+    confidence               REAL NOT NULL,
+    bbox_x                   REAL,            -- normalized (x, y, w, h) in [0, 1]
+    bbox_y                   REAL,
+    bbox_w                   REAL,
+    bbox_h                   REAL,
+    crop_path                TEXT,            -- relative to data_root
+    model_name               TEXT NOT NULL,
+    model_version            TEXT,
+    is_active                INTEGER NOT NULL DEFAULT 1,
+    created_at               TEXT NOT NULL,
+    -- Phase 5 re-identification columns (added by migration 0002)
+    embedding_path           TEXT,            -- relative to data_root; .npy file
+    reid_model_name          TEXT,
+    reid_model_version       TEXT,
+    individual_id            INTEGER REFERENCES individuals(id),
+    individual_similarity    REAL,            -- cosine similarity; 1.0 sentinel for founding detections
+    individual_assigned_by   TEXT,            -- 'algorithm' | 'human'
+    individual_assigned_at   TEXT             -- ISO 8601 timestamp
 );
 ```
+
+### individuals
+One row per identified individual animal (added by migration 0002).
+
+```sql
+CREATE TABLE individuals (
+    id           INTEGER PRIMARY KEY,
+    species_leaf TEXT NOT NULL,    -- leaf of taxonomy string, e.g. 'domestic cat'
+    nickname     TEXT,             -- null until set via crittercam name-individual
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+```
+
+IDs are gap-filling integers (lowest unused positive integer), so they restart from 1
+after a full reset rather than continuing from the historical SQLite maximum.
 
 #### Detection label format
 
