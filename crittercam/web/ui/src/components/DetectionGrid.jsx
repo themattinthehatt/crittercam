@@ -85,11 +85,7 @@ export default function DetectionGrid() {
                     alt={detection.label}
                     title={`${detection.label} (${(detection.confidence * 100).toFixed(1)}%)`}
                   />
-                  <div className="grid-cell-label">
-                    {detection.individual_id !== null
-                      ? (detection.nickname || `#${detection.individual_id}`)
-                      : detection.label}
-                  </div>
+                  <div className="grid-cell-label">{detection.label}</div>
                 </div>
               ))}
             </div>

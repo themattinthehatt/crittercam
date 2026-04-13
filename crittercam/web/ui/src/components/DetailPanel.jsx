@@ -74,17 +74,11 @@ export default function DetailPanel({ detectionId, onClose }) {
           </div>
         )}
         {detection.individual_id !== null && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <div className="meta-row">
-              <span className="meta-label">individual</span>
-              <span className="meta-value">#{detection.individual_id}</span>
-            </div>
-            {detection.nickname !== null && (
-              <div className="meta-row">
-                <span className="meta-label">nickname</span>
-                <span className="meta-value">{detection.nickname}</span>
-              </div>
-            )}
+          <div className="meta-row" style={{ marginTop: '0.75rem' }}>
+            <span className="meta-label">individual</span>
+            <span className="meta-value">
+              {detection.nickname || `#${detection.individual_id}`}
+            </span>
           </div>
         )}
       </div>

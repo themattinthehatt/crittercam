@@ -61,7 +61,7 @@ export default function FilterBar({
             <option value="">all</option>
             {individualList.map(ind => (
               <option key={ind.id} value={String(ind.id)}>
-                {ind.nickname ? `#${ind.id} — ${ind.nickname}` : `#${ind.id}`}
+                {ind.nickname || `#${ind.id}`}
               </option>
             ))}
           </select>
