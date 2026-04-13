@@ -12,7 +12,9 @@ from crittercam.pipeline.identify import (
     _get_gallery,
     enqueue_pending,
     identify_pending,
+    match_pending,
     reidentify_all,
+    reset_assignments,
 )
 
 
@@ -638,6 +640,378 @@ class TestIdentifyPendingMatching:
                                 {'a': det1, 'b': det2}).fetchall()
         ]
         assert ids[0] == ids[1]
+
+
+# ---------------------------------------------------------------------------
+# TestResetAssignments
+# ---------------------------------------------------------------------------
+
+class TestResetAssignments:
+    """Test the reset_assignments function."""
+
+    def _seed_algorithm_detection(self, db, data_root, detection_id, individual_id):
+        """Assign an individual to a detection as algorithm-assigned."""
+        crop_rel = db.execute(
+            'SELECT crop_path FROM detections WHERE id = :id', {'id': detection_id},
+        ).fetchone()['crop_path']
+        emb_rel = _write_embedding(data_root, crop_rel, _unit([1, 0, 0, 0]))
+        db.execute(
+            '''
+            UPDATE detections
+            SET embedding_path = :ep, reid_model_name = 'mock',
+                individual_id = :iid, individual_similarity = 0.9,
+                individual_assigned_by = 'algorithm',
+                individual_assigned_at = '2026-03-15T10:00:00+00:00'
+            WHERE id = :did
+            ''',
+            {'ep': emb_rel, 'iid': individual_id, 'did': detection_id},
+        )
+        db.commit()
+
+    def test_clears_algorithm_assignment_fields(self, db, data_root, detection):
+        # Arrange
+        ind_id = _insert_individual(db)
+        self._seed_algorithm_detection(db, data_root, detection['detection_id'], ind_id)
+
+        # Act
+        reset_assignments(db)
+
+        # Assert
+        row = db.execute(
+            'SELECT individual_id, individual_similarity,'
+            ' individual_assigned_by, individual_assigned_at'
+            ' FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['individual_id'] is None
+        assert row['individual_similarity'] is None
+        assert row['individual_assigned_by'] is None
+        assert row['individual_assigned_at'] is None
+
+    def test_preserves_embedding_fields(self, db, data_root, detection):
+        # Arrange — embedding should survive reset_assignments
+        ind_id = _insert_individual(db)
+        self._seed_algorithm_detection(db, data_root, detection['detection_id'], ind_id)
+
+        # Act
+        reset_assignments(db)
+
+        # Assert — embedding_path and reid_model_name still set
+        row = db.execute(
+            'SELECT embedding_path, reid_model_name FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['embedding_path'] is not None
+        assert row['reid_model_name'] == 'mock'
+
+    def test_preserves_human_assignment(self, db, data_root, detection):
+        # Arrange
+        ind_id = _insert_individual(db)
+        db.execute(
+            "UPDATE detections SET individual_id = :iid, individual_assigned_by = 'human'"
+            ' WHERE id = :did',
+            {'iid': ind_id, 'did': detection['detection_id']},
+        )
+        db.commit()
+
+        # Act
+        reset_assignments(db)
+
+        # Assert — human detection untouched
+        row = db.execute(
+            'SELECT individual_id, individual_assigned_by FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['individual_id'] == ind_id
+        assert row['individual_assigned_by'] == 'human'
+
+    def test_returns_count_of_cleared_detections(self, db, data_root, detection):
+        # Arrange
+        ind_id = _insert_individual(db)
+        self._seed_algorithm_detection(db, data_root, detection['detection_id'], ind_id)
+
+        # Act
+        n = reset_assignments(db)
+
+        # Assert
+        assert n == 1
+
+    def test_deletes_orphaned_individual(self, db, data_root, detection):
+        # Arrange — individual with only algorithm-assigned detection
+        ind_id = _insert_individual(db)
+        self._seed_algorithm_detection(db, data_root, detection['detection_id'], ind_id)
+
+        # Act
+        reset_assignments(db)
+
+        # Assert
+        row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': ind_id},
+        ).fetchone()
+        assert row is None
+
+    def test_preserves_individual_with_human_detection(self, db, data_root, detection):
+        # Arrange — individual anchored by a human-assigned detection
+        ind_id = _insert_individual(db)
+        db.execute(
+            "UPDATE detections SET individual_id = :iid, individual_assigned_by = 'human'"
+            ' WHERE id = :did',
+            {'iid': ind_id, 'did': detection['detection_id']},
+        )
+        db.commit()
+
+        # Act
+        reset_assignments(db)
+
+        # Assert — individual survives
+        row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': ind_id},
+        ).fetchone()
+        assert row is not None
+
+    def test_species_filter_only_clears_matching(self, db, data_root):
+        # Arrange — one cat and one dog, both algorithm-assigned
+        cat_label = 'a;b;c;d;e;f;g;felis catus'
+        dog_label = 'a;b;c;d;e;f;g;canis lupus'
+        cat_iid = _insert_individual(db, 'felis catus')
+        dog_iid = _insert_individual(db, 'canis lupus')
+
+        cat_img = _insert_image(db, data_root, 'cat.jpg')
+        dog_img = _insert_image(db, data_root, 'dog.jpg')
+        cat_det = _insert_detection(db, data_root, cat_img, label=cat_label, name='cat')
+        dog_det = _insert_detection(db, data_root, dog_img, label=dog_label, name='dog')
+
+        for det_id, ind_id in [(cat_det, cat_iid), (dog_det, dog_iid)]:
+            crop_rel = db.execute(
+                'SELECT crop_path FROM detections WHERE id = :id', {'id': det_id},
+            ).fetchone()['crop_path']
+            emb_rel = _write_embedding(data_root, crop_rel, _unit([1, 0, 0, 0]))
+            db.execute(
+                "UPDATE detections SET embedding_path = :ep, individual_id = :iid,"
+                " individual_assigned_by = 'algorithm' WHERE id = :did",
+                {'ep': emb_rel, 'iid': ind_id, 'did': det_id},
+            )
+        db.commit()
+
+        # Act — reset only cats
+        reset_assignments(db, species=['felis catus'])
+
+        # Assert — cat cleared, dog untouched
+        cat_row = db.execute(
+            'SELECT individual_id FROM detections WHERE id = :id', {'id': cat_det},
+        ).fetchone()
+        dog_row = db.execute(
+            'SELECT individual_id FROM detections WHERE id = :id', {'id': dog_det},
+        ).fetchone()
+        assert cat_row['individual_id'] is None
+        assert dog_row['individual_id'] == dog_iid
+
+
+# ---------------------------------------------------------------------------
+# TestMatchPending
+# ---------------------------------------------------------------------------
+
+class TestMatchPending:
+    """Test the match_pending function."""
+
+    def _seed_embedded_detection(self, db, data_root, detection_id, vector):
+        """Write an embedding file and update the detection row."""
+        crop_rel = db.execute(
+            'SELECT crop_path FROM detections WHERE id = :id', {'id': detection_id},
+        ).fetchone()['crop_path']
+        emb_rel = _write_embedding(data_root, crop_rel, vector)
+        db.execute(
+            "UPDATE detections SET embedding_path = :ep, reid_model_name = 'mock' WHERE id = :id",
+            {'ep': emb_rel, 'id': detection_id},
+        )
+        db.commit()
+
+    def test_returns_empty_summary_when_no_unmatched(self, db, data_root, detection):
+        # Arrange — no embeddings set
+        summary = match_pending(data_root, db)
+
+        # Assert
+        assert summary.identified == 0
+        assert summary.embedded == 0
+
+    def test_creates_new_individual_for_unmatched_detection(self, db, data_root, detection):
+        # Arrange
+        self._seed_embedded_detection(db, data_root, detection['detection_id'], _unit([1, 0, 0, 0]))
+
+        # Act
+        summary = match_pending(data_root, db)
+
+        # Assert
+        assert summary.identified == 1
+        count = db.execute('SELECT COUNT(*) FROM individuals').fetchone()[0]
+        assert count == 1
+
+    def test_assigns_algorithm_as_source(self, db, data_root, detection):
+        # Arrange
+        self._seed_embedded_detection(db, data_root, detection['detection_id'], _unit([1, 0, 0, 0]))
+
+        # Act
+        match_pending(data_root, db)
+
+        # Assert
+        row = db.execute(
+            'SELECT individual_assigned_by FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['individual_assigned_by'] == 'algorithm'
+
+    def test_founding_detection_gets_sentinel_similarity(self, db, data_root, detection):
+        # Arrange
+        self._seed_embedded_detection(db, data_root, detection['detection_id'], _unit([1, 0, 0, 0]))
+
+        # Act
+        match_pending(data_root, db)
+
+        # Assert
+        row = db.execute(
+            'SELECT individual_similarity FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['individual_similarity'] == pytest.approx(1.0)
+
+    def test_matches_existing_individual_above_threshold(self, db, data_root, detection):
+        # Arrange — seed gallery with a similar embedding
+        ind_id = _insert_individual(db)
+        img2_id = _insert_image(db, data_root, 'IMG_002.jpg')
+        det2_id = _insert_detection(db, data_root, img2_id, name='IMG_002')
+        emb_rel = _write_embedding(
+            data_root, 'derived/2026/03/15/IMG_002_det001.jpg', _unit([1, 0, 0, 0]),
+        )
+        db.execute(
+            "UPDATE detections SET embedding_path = :ep, individual_id = :iid,"
+            " individual_assigned_by = 'algorithm' WHERE id = :did",
+            {'ep': emb_rel, 'iid': ind_id, 'did': det2_id},
+        )
+        db.commit()
+
+        self._seed_embedded_detection(db, data_root, detection['detection_id'], _unit([1, 0, 0, 0]))
+
+        # Act
+        match_pending(data_root, db, threshold=0.5)
+
+        # Assert — matched to existing, no new individual
+        row = db.execute(
+            'SELECT individual_id FROM detections WHERE id = :id',
+            {'id': detection['detection_id']},
+        ).fetchone()
+        assert row['individual_id'] == ind_id
+        assert db.execute('SELECT COUNT(*) FROM individuals').fetchone()[0] == 1
+
+    def test_creates_new_individual_below_threshold(self, db, data_root, detection):
+        # Arrange — existing individual with orthogonal embedding
+        ind_id = _insert_individual(db)
+        img2_id = _insert_image(db, data_root, 'IMG_002.jpg')
+        det2_id = _insert_detection(db, data_root, img2_id, name='IMG_002')
+        emb_rel = _write_embedding(
+            data_root, 'derived/2026/03/15/IMG_002_det001.jpg', _unit([1, 0, 0, 0]),
+        )
+        db.execute(
+            "UPDATE detections SET embedding_path = :ep, individual_id = :iid,"
+            " individual_assigned_by = 'algorithm' WHERE id = :did",
+            {'ep': emb_rel, 'iid': ind_id, 'did': det2_id},
+        )
+        db.commit()
+
+        self._seed_embedded_detection(
+            db, data_root, detection['detection_id'], _unit([0, 1, 0, 0]),
+        )
+
+        # Act — similarity = 0 < threshold
+        match_pending(data_root, db, threshold=0.75)
+
+        # Assert — new individual created
+        assert db.execute('SELECT COUNT(*) FROM individuals').fetchone()[0] == 2
+
+    def test_in_memory_gallery_update_within_run(self, db, data_root):
+        # Arrange — two identical detections, no prior gallery
+        img1 = _insert_image(db, data_root, 'A.jpg')
+        img2 = _insert_image(db, data_root, 'B.jpg')
+        det1 = _insert_detection(db, data_root, img1, name='A')
+        det2 = _insert_detection(db, data_root, img2, name='B')
+        vec = _unit([1, 0, 0, 0])
+        for det_id, name in [(det1, 'A'), (det2, 'B')]:
+            crop_rel = db.execute(
+                'SELECT crop_path FROM detections WHERE id = :id', {'id': det_id},
+            ).fetchone()['crop_path']
+            emb_rel = _write_embedding(data_root, crop_rel, vec)
+            db.execute(
+                "UPDATE detections SET embedding_path = :ep, reid_model_name = 'mock'"
+                ' WHERE id = :id',
+                {'ep': emb_rel, 'id': det_id},
+            )
+        db.commit()
+
+        # Act — threshold low enough that second matches first
+        match_pending(data_root, db, threshold=0.5)
+
+        # Assert — only one individual; both share it
+        assert db.execute('SELECT COUNT(*) FROM individuals').fetchone()[0] == 1
+        ids = [
+            r['individual_id']
+            for r in db.execute(
+                'SELECT individual_id FROM detections WHERE id IN (:a, :b)',
+                {'a': det1, 'b': det2},
+            ).fetchall()
+        ]
+        assert ids[0] == ids[1]
+
+    def test_species_filter_restricts_matching(self, db, data_root):
+        # Arrange — cat and dog, both unmatched and embedded
+        cat_img = _insert_image(db, data_root, 'cat.jpg')
+        dog_img = _insert_image(db, data_root, 'dog.jpg')
+        cat_det = _insert_detection(
+            db, data_root, cat_img,
+            label='a;b;c;d;e;f;g;felis catus', name='cat',
+        )
+        dog_det = _insert_detection(
+            db, data_root, dog_img,
+            label='a;b;c;d;e;f;g;canis lupus', name='dog',
+        )
+        for det_id in [cat_det, dog_det]:
+            crop_rel = db.execute(
+                'SELECT crop_path FROM detections WHERE id = :id', {'id': det_id},
+            ).fetchone()['crop_path']
+            emb_rel = _write_embedding(data_root, crop_rel, _unit([1, 0, 0, 0]))
+            db.execute(
+                "UPDATE detections SET embedding_path = :ep, reid_model_name = 'mock'"
+                ' WHERE id = :id',
+                {'ep': emb_rel, 'id': det_id},
+            )
+        db.commit()
+
+        # Act — match only cats
+        summary = match_pending(data_root, db, species=['felis catus'])
+
+        # Assert — only cat assigned, dog untouched
+        assert summary.identified == 1
+        cat_row = db.execute(
+            'SELECT individual_id FROM detections WHERE id = :id', {'id': cat_det},
+        ).fetchone()
+        dog_row = db.execute(
+            'SELECT individual_id FROM detections WHERE id = :id', {'id': dog_det},
+        ).fetchone()
+        assert cat_row['individual_id'] is not None
+        assert dog_row['individual_id'] is None
+
+    def test_skips_detection_with_missing_embedding_file(self, db, data_root, detection):
+        # Arrange — set embedding_path to a nonexistent file
+        db.execute(
+            "UPDATE detections SET embedding_path = 'derived/missing_emb.npy'"
+            ' WHERE id = :id',
+            {'id': detection['detection_id']},
+        )
+        db.commit()
+
+        # Act — should not raise, should just skip
+        summary = match_pending(data_root, db)
+
+        # Assert
+        assert summary.identified == 0
 
 
 # ---------------------------------------------------------------------------

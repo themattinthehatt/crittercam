@@ -176,6 +176,233 @@ def reidentify_all(
     return cursor.rowcount
 
 
+def reset_assignments(
+    conn: sqlite3.Connection,
+    species: list[str] | None = None,
+) -> int:
+    """Clear algorithm-assigned individual identities without touching embeddings.
+
+    Unlike reidentify_all, this leaves embedding_path, reid_model_name, and
+    reid_model_version intact so Phase 1 does not need to re-run. Use this
+    before match_pending when exploring threshold values.
+
+    Human-assigned detections are left untouched. Orphaned individuals (those
+    with no remaining human-assigned detections) are deleted so the gallery
+    starts clean for the next match_pending call.
+
+    Args:
+        conn: open database connection
+        species: leaf names to restrict to, or None for all species
+
+    Returns:
+        number of detections cleared
+    """
+    species_filter = _build_species_filter(species, table_alias='')
+
+    assignment_conditions = [
+        'is_active = 1',
+        "individual_assigned_by = 'algorithm'",
+    ]
+    if species_filter['clause']:
+        assignment_conditions.append(species_filter['clause'])
+    assignment_where = ' AND '.join(assignment_conditions)
+    cursor = conn.execute(
+        f'''
+        UPDATE detections
+        SET individual_id          = NULL,
+            individual_similarity  = NULL,
+            individual_assigned_by = NULL,
+            individual_assigned_at = NULL
+        WHERE {assignment_where}
+        ''',
+        species_filter['params'],
+    )
+    n_cleared = cursor.rowcount
+
+    # delete orphaned individuals so the gallery is clean for re-matching;
+    # scope to species when a filter is given
+    ind_conditions = [
+        'id NOT IN ('
+        '  SELECT DISTINCT individual_id FROM detections'
+        "  WHERE individual_assigned_by = 'human' AND individual_id IS NOT NULL"
+        ')',
+    ]
+    ind_params: dict = {}
+    if species_filter['clause']:
+        ind_leaf_conditions = []
+        for i, leaf in enumerate(species or []):
+            ind_params[f'ind_labellike{i}'] = f'%;{leaf}'
+            ind_leaf_conditions.append(f'species_leaf LIKE :ind_labellike{i}')
+        ind_conditions.append(f'({" OR ".join(ind_leaf_conditions)})')
+    conn.execute(
+        f'DELETE FROM individuals WHERE {" AND ".join(ind_conditions)}',
+        ind_params,
+    )
+    conn.commit()
+    return n_cleared
+
+
+def match_pending(
+    data_root: Path,
+    conn: sqlite3.Connection,
+    threshold: float = 0.75,
+    species: list[str] | None = None,
+) -> IdentifySummary:
+    """Run gallery-based individual matching for embedded-but-unassigned detections.
+
+    For each active detection that has an embedding but no individual assignment,
+    compares against the per-species gallery using vectorized cosine similarity.
+    A detection whose nearest neighbour exceeds the threshold is assigned to that
+    individual; one below threshold creates a new individual row.
+
+    Intended to be called after reset_assignments when exploring threshold values,
+    or internally by identify_pending after embedding completes.
+
+    Args:
+        data_root: root directory for resolving embedding file paths
+        conn: open database connection
+        threshold: minimum cosine similarity to match an existing individual
+        species: leaf names to restrict to, or None for all species
+
+    Returns:
+        IdentifySummary with identified count (embedded is always 0)
+    """
+    summary = IdentifySummary()
+    species_filter = _build_species_filter(species)
+
+    unmatched = conn.execute(
+        f'''
+        SELECT d.id, d.embedding_path, d.label
+        FROM detections d
+        WHERE d.is_active = 1
+          AND d.embedding_path IS NOT NULL
+          AND d.individual_id IS NULL
+        {('AND ' + species_filter['clause']) if species_filter['clause'] else ''}
+        ORDER BY d.id
+        ''',
+        species_filter['params'],
+    ).fetchall()
+
+    if not unmatched:
+        return summary
+
+    # group by species leaf to build one gallery matrix per species
+    species_to_dets: dict[str, list] = {}
+    for det in unmatched:
+        leaf = det['label'].split(';')[-1]
+        species_to_dets.setdefault(leaf, []).append(det)
+
+    # pre-load per-species gallery matrices with zero padding for new entries
+    galleries: dict[str, dict] = {}
+    for leaf, dets in species_to_dets.items():
+        db_gallery = _get_gallery(conn, data_root, leaf)
+        n_existing = len(db_gallery)
+        n_new_max = len(dets)
+
+        embed_dim: int | None = None
+        if db_gallery:
+            embed_dim = db_gallery[0][1].shape[0]
+        else:
+            for det in dets:
+                emb_path = data_root / det['embedding_path']
+                if emb_path.exists():
+                    embed_dim = np.load(emb_path).shape[0]
+                    break
+
+        if embed_dim is None:
+            logger.warning(f'cannot determine embedding dimension for {leaf!r}; skipping')
+            continue
+
+        capacity = n_existing + n_new_max
+        matrix = np.zeros((capacity, embed_dim), dtype=np.float32)
+        individual_ids: list[int | None] = [None] * capacity
+        for i, (ind_id, vec) in enumerate(db_gallery):
+            matrix[i] = vec
+            individual_ids[i] = ind_id
+
+        galleries[leaf] = {
+            'matrix': matrix,
+            'individual_ids': individual_ids,
+            'n_filled': n_existing,
+        }
+
+    for det in unmatched:
+        detection_id = det['id']
+        species_leaf = det['label'].split(';')[-1]
+        g = galleries.get(species_leaf)
+
+        if g is None:
+            continue
+
+        emb_abs = data_root / det['embedding_path']
+        if not emb_abs.exists():
+            logger.warning(
+                f'embedding file missing for detection {detection_id}: {emb_abs}'
+            )
+            continue
+
+        query_vector = np.load(emb_abs).astype(np.float32)
+        ts = now()
+
+        n_filled = g['n_filled']
+        if n_filled > 0:
+            sims = g['matrix'][:n_filled] @ query_vector
+            best_idx = int(np.argmax(sims))
+            best_sim = float(sims[best_idx])
+            best_individual_id = g['individual_ids'][best_idx]
+        else:
+            best_individual_id, best_sim = None, -1.0
+
+        if best_individual_id is not None and best_sim >= threshold:
+            individual_id = best_individual_id
+            similarity = best_sim
+            logger.info(
+                f'detection {detection_id}: matched individual {individual_id}'
+                f' ({species_leaf}, similarity={similarity:.3f})'
+            )
+        else:
+            conn.execute(
+                '''
+                INSERT INTO individuals (species_leaf, created_at, updated_at)
+                VALUES (:species_leaf, :created_at, :updated_at)
+                ''',
+                {'species_leaf': species_leaf, 'created_at': ts, 'updated_at': ts},
+            )
+            conn.commit()
+            individual_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+            similarity = 1.0
+            logger.info(
+                f'detection {detection_id}: new individual {individual_id}'
+                f' ({species_leaf})'
+            )
+
+        conn.execute(
+            '''
+            UPDATE detections
+            SET individual_id          = :individual_id,
+                individual_similarity  = :individual_similarity,
+                individual_assigned_by = 'algorithm',
+                individual_assigned_at = :individual_assigned_at
+            WHERE id = :detection_id
+            ''',
+            {
+                'individual_id': individual_id,
+                'individual_similarity': similarity,
+                'individual_assigned_at': ts,
+                'detection_id': detection_id,
+            },
+        )
+        conn.commit()
+
+        g['matrix'][n_filled] = query_vector
+        g['individual_ids'][n_filled] = individual_id
+        g['n_filled'] += 1
+
+        summary.identified += 1
+
+    return summary
+
+
 def identify_pending(
     data_root: Path,
     conn: sqlite3.Connection,
@@ -211,10 +438,10 @@ def identify_pending(
         IdentifySummary with counts and per-file error details
     """
     summary = IdentifySummary()
-    species_filter = _build_species_filter(species)
 
     # --- Phase 1: embedding ---
 
+    species_filter = _build_species_filter(species)
     pending = conn.execute(
         f'''
         SELECT pj.id AS job_id, pj.detection_id,
@@ -287,143 +514,8 @@ def identify_pending(
 
     # --- Phase 2: gallery matching ---
 
-    unmatched = conn.execute(
-        f'''
-        SELECT d.id, d.embedding_path, d.label
-        FROM detections d
-        WHERE d.is_active = 1
-          AND d.embedding_path IS NOT NULL
-          AND d.individual_id IS NULL
-        {('AND ' + species_filter['clause']) if species_filter['clause'] else ''}
-        ORDER BY d.id
-        ''',
-        species_filter['params'],
-    ).fetchall()
-
-    if not unmatched:
-        return summary
-
-    # group unmatched detections by species leaf so we can build one gallery
-    # matrix per species rather than querying the DB on every detection
-    species_to_dets: dict[str, list] = {}
-    for det in unmatched:
-        leaf = det['label'].split(';')[-1]
-        species_to_dets.setdefault(leaf, []).append(det)
-
-    # pre-load per-species gallery matrices with zero padding for new entries
-    galleries: dict[str, dict] = {}
-    for leaf, dets in species_to_dets.items():
-        db_gallery = _get_gallery(conn, data_root, leaf)
-        n_existing = len(db_gallery)
-        n_new_max = len(dets)
-
-        # infer embedding dimension from the gallery or the first available file
-        embed_dim: int | None = None
-        if db_gallery:
-            embed_dim = db_gallery[0][1].shape[0]
-        else:
-            for det in dets:
-                emb_path = data_root / det['embedding_path']
-                if emb_path.exists():
-                    embed_dim = np.load(emb_path).shape[0]
-                    break
-
-        if embed_dim is None:
-            logger.warning(f'cannot determine embedding dimension for {leaf!r}; skipping')
-            continue
-
-        # pre-allocate: existing rows filled, remaining rows zeroed as placeholders
-        capacity = n_existing + n_new_max
-        matrix = np.zeros((capacity, embed_dim), dtype=np.float32)
-        individual_ids: list[int | None] = [None] * capacity
-        for i, (ind_id, vec) in enumerate(db_gallery):
-            matrix[i] = vec
-            individual_ids[i] = ind_id
-
-        galleries[leaf] = {
-            'matrix': matrix,
-            'individual_ids': individual_ids,
-            'n_filled': n_existing,
-        }
-
-    for det in unmatched:
-        detection_id = det['id']
-        species_leaf = det['label'].split(';')[-1]
-        g = galleries.get(species_leaf)
-
-        if g is None:
-            continue
-
-        emb_abs = data_root / det['embedding_path']
-        if not emb_abs.exists():
-            logger.warning(
-                f'embedding file missing for detection {detection_id}: {emb_abs}'
-            )
-            continue
-
-        query_vector = np.load(emb_abs).astype(np.float32)
-        ts = now()
-
-        n_filled = g['n_filled']
-        if n_filled > 0:
-            # vectorized cosine similarity: dot product of unit-normalised vectors
-            sims = g['matrix'][:n_filled] @ query_vector
-            best_idx = int(np.argmax(sims))
-            best_sim = float(sims[best_idx])
-            best_individual_id = g['individual_ids'][best_idx]
-        else:
-            best_individual_id, best_sim = None, -1.0
-
-        if best_individual_id is not None and best_sim >= threshold:
-            individual_id = best_individual_id
-            similarity = best_sim
-            logger.info(
-                f'detection {detection_id}: matched individual {individual_id}'
-                f' ({species_leaf}, similarity={similarity:.3f})'
-            )
-        else:
-            conn.execute(
-                '''
-                INSERT INTO individuals (species_leaf, created_at, updated_at)
-                VALUES (:species_leaf, :created_at, :updated_at)
-                ''',
-                {'species_leaf': species_leaf, 'created_at': ts, 'updated_at': ts},
-            )
-            conn.commit()
-            individual_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
-            # 1.0 is the sentinel for a founding detection (no match was made)
-            similarity = 1.0
-            logger.info(
-                f'detection {detection_id}: new individual {individual_id}'
-                f' ({species_leaf})'
-            )
-
-        conn.execute(
-            '''
-            UPDATE detections
-            SET individual_id          = :individual_id,
-                individual_similarity  = :individual_similarity,
-                individual_assigned_by = 'algorithm',
-                individual_assigned_at = :individual_assigned_at
-            WHERE id = :detection_id
-            ''',
-            {
-                'individual_id': individual_id,
-                'individual_similarity': similarity,
-                'individual_assigned_at': ts,
-                'detection_id': detection_id,
-            },
-        )
-        conn.commit()
-
-        # update the in-memory gallery so subsequent detections can match against
-        # this one without a DB round-trip
-        g['matrix'][n_filled] = query_vector
-        g['individual_ids'][n_filled] = individual_id
-        g['n_filled'] += 1
-
-        summary.identified += 1
-
+    match_summary = match_pending(data_root, conn, threshold, species)
+    summary.identified = match_summary.identified
     return summary
 
 

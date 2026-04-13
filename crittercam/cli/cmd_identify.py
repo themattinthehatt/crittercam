@@ -47,6 +47,14 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         action='store_true',
         help='clear all algorithm-assigned identities and re-run from scratch',
     )
+    parser.add_argument(
+        '--skip-embedding',
+        action='store_true',
+        help=(
+            'skip embedding phase; re-run gallery matching only using existing embeddings.'
+            ' Use with --threshold to explore matching without re-embedding.'
+        ),
+    )
     parser.set_defaults(handler=cmd_identify)
 
 
@@ -56,8 +64,13 @@ def cmd_identify(args: argparse.Namespace) -> None:
     Args:
         args: parsed command-line arguments
     """
-    from crittercam.identifier.megadescriptor import MegaDescriptorAdapter
-    from crittercam.pipeline.identify import enqueue_pending, identify_pending, reidentify_all
+    from crittercam.pipeline.identify import (
+        enqueue_pending,
+        identify_pending,
+        match_pending,
+        reidentify_all,
+        reset_assignments,
+    )
 
     try:
         config = load(CONFIG_PATH)
@@ -70,33 +83,48 @@ def cmd_identify(args: argparse.Namespace) -> None:
 
     conn = connect(config.db_path)
     try:
-        if args.reidentify_all:
-            n = reidentify_all(conn, species=args.species)
+        if args.skip_embedding:
+            n = reset_assignments(conn, species=args.species)
             if n:
-                print(f'Reset {n} embedding job(s) to pending for full re-identification.')
-        elif args.retry_errors:
-            n = reset_errors(conn, job_type='embedding')
-            if n:
-                print(f'Reset {n} errored embedding job(s) to pending.')
+                print(f'Cleared {n} algorithm-assigned individual(s) for re-matching.')
+            summary = match_pending(
+                data_root=config.data_root,
+                conn=conn,
+                threshold=args.threshold,
+                species=args.species,
+            )
+        else:
+            if args.reidentify_all:
+                n = reidentify_all(conn, species=args.species)
+                if n:
+                    print(f'Reset {n} embedding job(s) to pending for full re-identification.')
+            elif args.retry_errors:
+                n = reset_errors(conn, job_type='embedding')
+                if n:
+                    print(f'Reset {n} errored embedding job(s) to pending.')
 
-        n_enqueued = enqueue_pending(conn, species=args.species)
-        if n_enqueued:
-            print(f'Enqueued {n_enqueued} new embedding job(s).')
+            n_enqueued = enqueue_pending(conn, species=args.species)
+            if n_enqueued:
+                print(f'Enqueued {n_enqueued} new embedding job(s).')
 
-        identifier = MegaDescriptorAdapter()
-        summary = identify_pending(
-            data_root=config.data_root,
-            conn=conn,
-            identifier=identifier,
-            threshold=args.threshold,
-            species=args.species,
-        )
+            from crittercam.identifier.megadescriptor import MegaDescriptorAdapter
+            identifier = MegaDescriptorAdapter()
+            summary = identify_pending(
+                data_root=config.data_root,
+                conn=conn,
+                identifier=identifier,
+                threshold=args.threshold,
+                species=args.species,
+            )
     finally:
         conn.close()
 
-    print(
-        f'Done: {summary.embedded} embedded, {summary.identified} identified,'
-        f' {len(summary.errors)} errors.'
-    )
-    for filename, reason in summary.errors.items():
-        print(f'  error — {filename}: {reason}')
+    if args.skip_embedding:
+        print(f'Done: {summary.identified} identified.')
+    else:
+        print(
+            f'Done: {summary.embedded} embedded, {summary.identified} identified,'
+            f' {len(summary.errors)} errors.'
+        )
+        for filename, reason in summary.errors.items():
+            print(f'  error — {filename}: {reason}')

@@ -17,6 +17,7 @@ def _args(
     threshold=0.75,
     retry_errors=False,
     reidentify_all=False,
+    skip_embedding=False,
 ):
     """Build a minimal Namespace for cmd_identify."""
     return argparse.Namespace(
@@ -25,6 +26,7 @@ def _args(
         threshold=threshold,
         retry_errors=retry_errors,
         reidentify_all=reidentify_all,
+        skip_embedding=skip_embedding,
     )
 
 
@@ -43,6 +45,8 @@ def mock_identify_stack(tmp_path, monkeypatch):
             patch('crittercam.pipeline.identify.enqueue_pending', return_value=0), \
             patch('crittercam.pipeline.identify.identify_pending', return_value=mock_summary), \
             patch('crittercam.pipeline.identify.reidentify_all', return_value=0), \
+            patch('crittercam.pipeline.identify.reset_assignments', return_value=0), \
+            patch('crittercam.pipeline.identify.match_pending', return_value=mock_summary), \
             patch('crittercam.cli.cmd_identify.reset_errors', return_value=0):
         yield {
             'config': config,
@@ -198,4 +202,89 @@ class TestCmdIdentifyEnqueueAndRun:
                 cmd_identify(_args())
 
         # Assert — conn.close() still called via finally
+        mock_identify_stack['conn'].close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# TestCmdIdentifySkipEmbedding
+# ---------------------------------------------------------------------------
+
+class TestCmdIdentifySkipEmbedding:
+    """Test the --skip-embedding flag."""
+
+    def test_calls_reset_assignments(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.reset_assignments', return_value=5) as mock_reset:
+            cmd_identify(_args(skip_embedding=True))
+
+        # Assert
+        mock_reset.assert_called_once()
+
+    def test_reset_assignments_receives_species(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.reset_assignments', return_value=0) as mock_reset:
+            cmd_identify(_args(skip_embedding=True, species=['felis catus']))
+
+        # Assert
+        _, kwargs = mock_reset.call_args
+        assert kwargs.get('species') == ['felis catus']
+
+    def test_calls_match_pending(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.match_pending',
+                   return_value=IdentifySummary()) as mock_match:
+            cmd_identify(_args(skip_embedding=True))
+
+        # Assert
+        mock_match.assert_called_once()
+
+    def test_match_pending_receives_threshold(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.match_pending',
+                   return_value=IdentifySummary()) as mock_match:
+            cmd_identify(_args(skip_embedding=True, threshold=0.6))
+
+        # Assert
+        _, kwargs = mock_match.call_args
+        assert kwargs.get('threshold') == pytest.approx(0.6)
+
+    def test_match_pending_receives_species(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.match_pending',
+                   return_value=IdentifySummary()) as mock_match:
+            cmd_identify(_args(skip_embedding=True, species=['felis catus']))
+
+        # Assert
+        _, kwargs = mock_match.call_args
+        assert kwargs.get('species') == ['felis catus']
+
+    def test_does_not_call_identify_pending(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.identify_pending') as mock_ip:
+            cmd_identify(_args(skip_embedding=True))
+
+        # Assert
+        mock_ip.assert_not_called()
+
+    def test_does_not_call_enqueue_pending(self, mock_identify_stack):
+        # Act
+        with patch('crittercam.pipeline.identify.enqueue_pending') as mock_enq:
+            cmd_identify(_args(skip_embedding=True))
+
+        # Assert
+        mock_enq.assert_not_called()
+
+    def test_does_not_load_megadescriptor(self, mock_identify_stack):
+        # Act — MegaDescriptorAdapter must not be instantiated
+        with patch('crittercam.identifier.megadescriptor.MegaDescriptorAdapter') as mock_cls:
+            cmd_identify(_args(skip_embedding=True))
+
+        # Assert
+        mock_cls.assert_not_called()
+
+    def test_connection_closed_on_success(self, mock_identify_stack):
+        # Act
+        cmd_identify(_args(skip_embedding=True))
+
+        # Assert
         mock_identify_stack['conn'].close.assert_called_once()
