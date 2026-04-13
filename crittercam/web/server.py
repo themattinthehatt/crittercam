@@ -14,11 +14,6 @@ app = FastAPI(title='crittercam')
 app.include_router(stats.router)
 app.include_router(detections.router)
 
-# mount built React app if present; skipped in development (Vite serves the UI)
-_DIST_DIR = Path(__file__).parent / 'ui' / 'dist'
-if _DIST_DIR.exists():
-    app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='ui')
-
 
 @app.get('/media/{path:path}')
 def media(path: str) -> FileResponse:
@@ -46,3 +41,11 @@ def media(path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=f'file not found: {path}')
 
     return FileResponse(full_path)
+
+
+# mount built React app if present; skipped in development (Vite serves the UI).
+# must be defined after all API routes — the catch-all '/' mount would otherwise
+# intercept /media/ and /api/ requests before the route handlers can see them.
+_DIST_DIR = Path(__file__).parent / 'ui' / 'dist'
+if _DIST_DIR.exists():
+    app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='ui')

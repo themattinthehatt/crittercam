@@ -554,6 +554,76 @@ def _build_species_filter(
     return {'clause': f'({" OR ".join(leaf_conditions)})', 'params': params}
 
 
+def merge_individuals(
+    conn: sqlite3.Connection,
+    ids: list[int],
+) -> int:
+    """Merge a set of individuals into the one with the lowest id.
+
+    All detections belonging to any of the given individuals are reassigned to
+    the lowest id in the list and marked as human-assigned with individual_similarity
+    cleared. The individual rows for the non-target ids are deleted and the
+    target individual's updated_at is refreshed.
+
+    Args:
+        conn: open database connection
+        ids: individual ids to merge; must contain at least two entries and all
+            must exist in the individuals table
+
+    Returns:
+        the target individual id (the lowest in ids)
+
+    Raises:
+        ValueError: if fewer than two ids are provided or any id does not exist
+    """
+    if len(ids) < 2:
+        raise ValueError(f'merge requires at least two individual ids; got {len(ids)}')
+
+    placeholders = ', '.join(f':id{i}' for i in range(len(ids)))
+    id_params = {f'id{i}': v for i, v in enumerate(ids)}
+
+    found = {
+        row['id']
+        for row in conn.execute(
+            f'SELECT id FROM individuals WHERE id IN ({placeholders})', id_params,
+        ).fetchall()
+    }
+    missing = sorted(set(ids) - found)
+    if missing:
+        raise ValueError(f'individual id(s) not found: {missing}')
+
+    target = min(ids)
+    ts = now()
+
+    conn.execute(
+        f'''
+        UPDATE detections
+        SET individual_id          = :target,
+            individual_assigned_by = 'human',
+            individual_assigned_at = :ts,
+            individual_similarity  = NULL
+        WHERE individual_id IN ({placeholders})
+        ''',
+        {**id_params, 'target': target, 'ts': ts},
+    )
+
+    others = [v for v in ids if v != target]
+    other_placeholders = ', '.join(f':del{i}' for i in range(len(others)))
+    other_params = {f'del{i}': v for i, v in enumerate(others)}
+    conn.execute(
+        f'DELETE FROM individuals WHERE id IN ({other_placeholders})',
+        other_params,
+    )
+
+    conn.execute(
+        'UPDATE individuals SET updated_at = :ts WHERE id = :target',
+        {'ts': ts, 'target': target},
+    )
+
+    conn.commit()
+    return target
+
+
 def _next_individual_id(conn: sqlite3.Connection) -> int:
     """Return the smallest positive integer not currently used as an individual id.
 

@@ -14,6 +14,7 @@ from crittercam.pipeline.identify import (
     enqueue_pending,
     identify_pending,
     match_pending,
+    merge_individuals,
     reidentify_all,
     reset_assignments,
 )
@@ -1167,3 +1168,129 @@ class TestGetGallery:
 
         # Assert
         assert gallery == []
+
+
+# ---------------------------------------------------------------------------
+# TestMergeIndividuals
+# ---------------------------------------------------------------------------
+
+class TestMergeIndividuals:
+    """Test the merge_individuals function."""
+
+    def _seed_detection_with_individual(self, db, data_root, individual_id, name, assigned_by='algorithm'):
+        """Insert an image+detection and assign it to the given individual."""
+        image_id = _insert_image(db, data_root, f'{name}.jpg')
+        det_id = _insert_detection(db, data_root, image_id, name=name)
+        db.execute(
+            f"UPDATE detections SET individual_id = :iid, individual_assigned_by = :by,"
+            f" individual_assigned_at = 'now', individual_similarity = 0.9"
+            f' WHERE id = :did',
+            {'iid': individual_id, 'by': assigned_by, 'did': det_id},
+        )
+        db.commit()
+        return det_id
+
+    def test_returns_target_id(self, db, data_root):
+        # Arrange
+        ind1 = _insert_individual(db)
+        ind2 = _insert_individual(db)
+        ind3 = _insert_individual(db)
+
+        # Act
+        target = merge_individuals(db, [ind1, ind2, ind3])
+
+        # Assert
+        assert target == ind1
+
+    def test_target_is_lowest_id(self, db, data_root):
+        # Arrange — insert in non-sequential order
+        ind5 = db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (5, 'felis catus', 'now', 'now')"
+        ) and db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (2, 'felis catus', 'now', 'now')"
+        )
+        db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (8, 'felis catus', 'now', 'now')"
+        )
+        db.commit()
+
+        target = merge_individuals(db, [5, 2, 8])
+        assert target == 2
+
+    def test_reassigns_detections_to_target(self, db, data_root):
+        # Arrange
+        ind1 = _insert_individual(db)
+        ind2 = _insert_individual(db)
+        det1 = self._seed_detection_with_individual(db, data_root, ind1, 'A')
+        det2 = self._seed_detection_with_individual(db, data_root, ind2, 'B')
+
+        # Act
+        merge_individuals(db, [ind1, ind2])
+
+        # Assert — both detections point to ind1
+        for det_id in [det1, det2]:
+            row = db.execute(
+                'SELECT individual_id FROM detections WHERE id = :id', {'id': det_id},
+            ).fetchone()
+            assert row['individual_id'] == ind1
+
+    def test_merged_detections_marked_human(self, db, data_root):
+        # Arrange
+        ind1 = _insert_individual(db)
+        ind2 = _insert_individual(db)
+        det1 = self._seed_detection_with_individual(db, data_root, ind1, 'A')
+        det2 = self._seed_detection_with_individual(db, data_root, ind2, 'B')
+
+        # Act
+        merge_individuals(db, [ind1, ind2])
+
+        # Assert — both detections are now human-assigned
+        for det_id in [det1, det2]:
+            row = db.execute(
+                'SELECT individual_assigned_by FROM detections WHERE id = :id',
+                {'id': det_id},
+            ).fetchone()
+            assert row['individual_assigned_by'] == 'human'
+
+    def test_individual_similarity_cleared(self, db, data_root):
+        # Arrange
+        ind1 = _insert_individual(db)
+        ind2 = _insert_individual(db)
+        det = self._seed_detection_with_individual(db, data_root, ind2, 'A')
+
+        # Act
+        merge_individuals(db, [ind1, ind2])
+
+        # Assert
+        row = db.execute(
+            'SELECT individual_similarity FROM detections WHERE id = :id', {'id': det},
+        ).fetchone()
+        assert row['individual_similarity'] is None
+
+    def test_non_target_individuals_deleted(self, db, data_root):
+        # Arrange
+        ind1 = _insert_individual(db)
+        ind2 = _insert_individual(db)
+        ind3 = _insert_individual(db)
+
+        # Act
+        merge_individuals(db, [ind1, ind2, ind3])
+
+        # Assert — ind2 and ind3 gone; ind1 survives
+        assert db.execute('SELECT id FROM individuals WHERE id = :id', {'id': ind1}).fetchone() is not None
+        assert db.execute('SELECT id FROM individuals WHERE id = :id', {'id': ind2}).fetchone() is None
+        assert db.execute('SELECT id FROM individuals WHERE id = :id', {'id': ind3}).fetchone() is None
+
+    def test_raises_for_fewer_than_two_ids(self, db):
+        ind1 = _insert_individual(db)
+        with pytest.raises(ValueError, match='at least two'):
+            merge_individuals(db, [ind1])
+
+    def test_raises_for_missing_id(self, db):
+        ind1 = _insert_individual(db)
+        with pytest.raises(ValueError, match='not found'):
+            merge_individuals(db, [ind1, 9999])
