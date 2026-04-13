@@ -125,9 +125,11 @@ def list_detections(
 
     rows = conn.execute(
         f'''
-        SELECT d.id, d.label, d.confidence, d.crop_path
+        SELECT d.id, d.label, d.confidence, d.crop_path,
+               d.individual_id, ind.nickname
         FROM detections d
         JOIN images i ON i.id = d.image_id
+        LEFT JOIN individuals ind ON ind.id = d.individual_id
         WHERE {where}
         ORDER BY d.id DESC
         LIMIT :limit OFFSET :offset
@@ -144,6 +146,8 @@ def list_detections(
                 'label': row['label'].split(';')[-1],
                 'confidence': round(row['confidence'], 3),
                 'crop_url': f'/media/{row["crop_path"]}',
+                'individual_id': row['individual_id'],
+                'nickname': row['nickname'],
             }
             for row in rows
         ],

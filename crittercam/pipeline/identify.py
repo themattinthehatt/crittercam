@@ -554,6 +554,34 @@ def _build_species_filter(
     return {'clause': f'({" OR ".join(leaf_conditions)})', 'params': params}
 
 
+def name_individual(
+    conn: sqlite3.Connection,
+    individual_id: int,
+    nickname: str,
+) -> None:
+    """Set or update the nickname for an individual.
+
+    Args:
+        conn: open database connection
+        individual_id: id of the individual to name
+        nickname: display name to assign
+
+    Raises:
+        ValueError: if the individual_id does not exist
+    """
+    row = conn.execute(
+        'SELECT id FROM individuals WHERE id = :id', {'id': individual_id},
+    ).fetchone()
+    if row is None:
+        raise ValueError(f'individual id not found: {individual_id}')
+
+    conn.execute(
+        'UPDATE individuals SET nickname = :nickname, updated_at = :ts WHERE id = :id',
+        {'nickname': nickname, 'ts': now(), 'id': individual_id},
+    )
+    conn.commit()
+
+
 def merge_individuals(
     conn: sqlite3.Connection,
     ids: list[int],

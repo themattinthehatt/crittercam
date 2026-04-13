@@ -15,6 +15,7 @@ from crittercam.pipeline.identify import (
     identify_pending,
     match_pending,
     merge_individuals,
+    name_individual,
     reidentify_all,
     reset_assignments,
 )
@@ -1168,6 +1169,35 @@ class TestGetGallery:
 
         # Assert
         assert gallery == []
+
+
+# ---------------------------------------------------------------------------
+# TestNameIndividual
+# ---------------------------------------------------------------------------
+
+class TestNameIndividual:
+    """Test the name_individual function."""
+
+    def test_sets_nickname(self, db):
+        ind_id = _insert_individual(db)
+        name_individual(db, ind_id, 'fluffy')
+        row = db.execute(
+            'SELECT nickname FROM individuals WHERE id = :id', {'id': ind_id},
+        ).fetchone()
+        assert row['nickname'] == 'fluffy'
+
+    def test_overwrites_existing_nickname(self, db):
+        ind_id = _insert_individual(db)
+        name_individual(db, ind_id, 'fluffy')
+        name_individual(db, ind_id, 'mittens')
+        row = db.execute(
+            'SELECT nickname FROM individuals WHERE id = :id', {'id': ind_id},
+        ).fetchone()
+        assert row['nickname'] == 'mittens'
+
+    def test_raises_for_missing_id(self, db):
+        with pytest.raises(ValueError, match='not found'):
+            name_individual(db, 9999, 'fluffy')
 
 
 # ---------------------------------------------------------------------------
