@@ -28,11 +28,13 @@ class IdentifySummary:
     Attributes:
         embedded: number of detections successfully embedded
         identified: number of detections assigned to an individual
+        individuals: number of distinct individuals present in the batch
         errors: mapping of filename to error message for failed embeddings
     """
 
     embedded: int = 0
     identified: int = 0
+    individuals: int = 0
     errors: dict[str, str] = field(default_factory=dict)
 
 
@@ -143,8 +145,8 @@ def reidentify_all(
     if species_filter['clause']:
         ind_leaf_conditions = []
         for i, leaf in enumerate(species or []):
-            ind_params[f'ind_labellike{i}'] = f'%;{leaf}'
-            ind_leaf_conditions.append(f'species_leaf LIKE :ind_labellike{i}')
+            ind_params[f'ind_leaf{i}'] = leaf
+            ind_leaf_conditions.append(f'species_leaf = :ind_leaf{i}')
         ind_conditions.append(f'({" OR ".join(ind_leaf_conditions)})')
     ind_where = ' AND '.join(ind_conditions)
     conn.execute(f'DELETE FROM individuals WHERE {ind_where}', ind_params)
@@ -231,8 +233,8 @@ def reset_assignments(
     if species_filter['clause']:
         ind_leaf_conditions = []
         for i, leaf in enumerate(species or []):
-            ind_params[f'ind_labellike{i}'] = f'%;{leaf}'
-            ind_leaf_conditions.append(f'species_leaf LIKE :ind_labellike{i}')
+            ind_params[f'ind_leaf{i}'] = leaf
+            ind_leaf_conditions.append(f'species_leaf = :ind_leaf{i}')
         ind_conditions.append(f'({" OR ".join(ind_leaf_conditions)})')
     conn.execute(
         f'DELETE FROM individuals WHERE {" AND ".join(ind_conditions)}',
@@ -245,7 +247,7 @@ def reset_assignments(
 def match_pending(
     data_root: Path,
     conn: sqlite3.Connection,
-    threshold: float = 0.75,
+    threshold: float = 0.5,
     species: list[str] | None = None,
 ) -> IdentifySummary:
     """Run gallery-based individual matching for embedded-but-unassigned detections.
@@ -268,6 +270,7 @@ def match_pending(
         IdentifySummary with identified count (embedded is always 0)
     """
     summary = IdentifySummary()
+    assigned_individuals: set[int] = set()
     species_filter = _build_species_filter(species)
 
     unmatched = conn.execute(
@@ -361,15 +364,15 @@ def match_pending(
                 f' ({species_leaf}, similarity={similarity:.3f})'
             )
         else:
+            individual_id = _next_individual_id(conn)
             conn.execute(
                 '''
-                INSERT INTO individuals (species_leaf, created_at, updated_at)
-                VALUES (:species_leaf, :created_at, :updated_at)
+                INSERT INTO individuals (id, species_leaf, created_at, updated_at)
+                VALUES (:id, :species_leaf, :created_at, :updated_at)
                 ''',
-                {'species_leaf': species_leaf, 'created_at': ts, 'updated_at': ts},
+                {'id': individual_id, 'species_leaf': species_leaf, 'created_at': ts, 'updated_at': ts},
             )
             conn.commit()
-            individual_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
             similarity = 1.0
             logger.info(
                 f'detection {detection_id}: new individual {individual_id}'
@@ -398,8 +401,10 @@ def match_pending(
         g['individual_ids'][n_filled] = individual_id
         g['n_filled'] += 1
 
+        assigned_individuals.add(individual_id)
         summary.identified += 1
 
+    summary.individuals = len(assigned_individuals)
     return summary
 
 
@@ -407,7 +412,7 @@ def identify_pending(
     data_root: Path,
     conn: sqlite3.Connection,
     identifier: Identifier,
-    threshold: float = 0.75,
+    threshold: float = 0.5,
     species: list[str] | None = None,
 ) -> IdentifySummary:
     """Run embedding generation and gallery-based identity matching.
@@ -516,6 +521,7 @@ def identify_pending(
 
     match_summary = match_pending(data_root, conn, threshold, species)
     summary.identified = match_summary.identified
+    summary.individuals = match_summary.individuals
     return summary
 
 
@@ -546,6 +552,34 @@ def _build_species_filter(
         leaf_conditions.append(f'{col} LIKE :labellike{i}')
 
     return {'clause': f'({" OR ".join(leaf_conditions)})', 'params': params}
+
+
+def _next_individual_id(conn: sqlite3.Connection) -> int:
+    """Return the smallest positive integer not currently used as an individual id.
+
+    SQLite's INTEGER PRIMARY KEY never reuses a deleted rowid (it picks
+    max-ever + 1), so after deleting a batch of individuals the auto-assigned
+    ids would continue from the old high-water mark. Explicitly choosing the
+    lowest available id keeps numbering compact after a reset.
+
+    Args:
+        conn: open database connection
+
+    Returns:
+        smallest integer >= 1 not present in the individuals table
+    """
+    row = conn.execute(
+        '''
+        SELECT COALESCE(MIN(gap), 1) FROM (
+            SELECT 1 AS gap
+            WHERE NOT EXISTS (SELECT 1 FROM individuals WHERE id = 1)
+            UNION ALL
+            SELECT id + 1 FROM individuals
+            WHERE NOT EXISTS (SELECT 1 FROM individuals b WHERE b.id = individuals.id + 1)
+        )
+        '''
+    ).fetchone()[0]
+    return row
 
 
 def _get_gallery(

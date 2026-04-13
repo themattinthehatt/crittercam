@@ -15,7 +15,7 @@ def list_species() -> list[str]:
     """Return a sorted list of distinct species names present in active detections.
 
     Labels in the database are stored as semicolon-joined taxonomy paths
-    (e.g. 'animalia;chordata;...;vulpes vulpes'). This endpoint returns only
+    (e.g. 'animalia;chordata;...;domeastic cat'). This endpoint returns only
     the leaf name (the last segment) for each distinct label.
 
     Returns:
@@ -34,11 +34,37 @@ def list_species() -> list[str]:
     return sorted({row['label'].split(';')[-1] for row in rows})
 
 
+@router.get('/api/individuals')
+def list_individuals() -> list[dict]:
+    """Return all individuals that have at least one active detection with a crop.
+
+    Returns:
+        list of dicts with id, species_leaf, and nickname (nullable), sorted by id
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        '''
+        SELECT DISTINCT ind.id, ind.species_leaf, ind.nickname
+        FROM individuals ind
+        JOIN detections d ON d.individual_id = ind.id
+        WHERE d.is_active = 1
+          AND d.crop_path IS NOT NULL
+        ORDER BY ind.id
+        '''
+    ).fetchall()
+    conn.close()
+    return [
+        {'id': row['id'], 'species_leaf': row['species_leaf'], 'nickname': row['nickname']}
+        for row in rows
+    ]
+
+
 @router.get('/api/detections')
 def list_detections(
     page: int = 1,
     page_size: int = PAGE_SIZE,
     species: str | None = None,
+    individual_id: int | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> dict:
@@ -72,6 +98,10 @@ def list_detections(
         # match labels that are exactly the species name, or end with ';species'
         conditions.append("(d.label = :species OR d.label LIKE '%;' || :species)")
         params['species'] = species
+
+    if individual_id is not None:
+        conditions.append('d.individual_id = :individual_id')
+        params['individual_id'] = individual_id
 
     if date_from:
         conditions.append('i.captured_at >= :date_from')

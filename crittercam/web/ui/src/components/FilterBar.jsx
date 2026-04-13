@@ -8,24 +8,65 @@
 // with a single state update.
 
 export default function FilterBar({
+  browseMode, onBrowseModeChange,
   species, onSpeciesChange,
+  speciesList,
+  individual, onIndividualChange,
+  individualList,
   dateFrom, onDateFromChange,
   dateTo, onDateToChange,
-  speciesList,
 }) {
-  const hasFilters = species || dateFrom || dateTo
+  const hasFilters = (browseMode === 'species' ? species : individual) || dateFrom || dateTo
+
+  // switching modes clears both the species and individual filters
+  const handleModeChange = value => {
+    onBrowseModeChange(value)
+    onSpeciesChange('')
+    onIndividualChange('')
+  }
+
+  const handleClear = () => {
+    onSpeciesChange('')
+    onIndividualChange('')
+    onDateFromChange('')
+    onDateToChange('')
+  }
 
   return (
     <div className="filter-bar">
       <label className="filter-field">
-        <span className="filter-label">species</span>
-        <select value={species} onChange={e => onSpeciesChange(e.target.value)}>
-          <option value="">all</option>
-          {speciesList.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+        <span className="filter-label">browse by</span>
+        <select value={browseMode} onChange={e => handleModeChange(e.target.value)}>
+          <option value="species">species</option>
+          <option value="individual">individual</option>
         </select>
       </label>
+
+      <div className="filter-divider" />
+
+      {browseMode === 'species' ? (
+        <label className="filter-field">
+          <span className="filter-label">species</span>
+          <select value={species} onChange={e => onSpeciesChange(e.target.value)}>
+            <option value="">all</option>
+            {speciesList.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <label className="filter-field">
+          <span className="filter-label">individual</span>
+          <select value={individual} onChange={e => onIndividualChange(e.target.value)}>
+            <option value="">all</option>
+            {individualList.map(ind => (
+              <option key={ind.id} value={String(ind.id)}>
+                {ind.nickname ? `#${ind.id} — ${ind.nickname}` : `#${ind.id}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="filter-field">
         <span className="filter-label">from</span>
@@ -46,14 +87,7 @@ export default function FilterBar({
       </label>
 
       {hasFilters && (
-        <button
-          className="filter-clear"
-          onClick={() => {
-            onSpeciesChange('')
-            onDateFromChange('')
-            onDateToChange('')
-          }}
-        >
+        <button className="filter-clear" onClick={handleClear}>
           clear filters
         </button>
       )}

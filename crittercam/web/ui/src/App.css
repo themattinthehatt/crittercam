@@ -191,6 +191,13 @@ header p {
   background: #fff;
 }
 
+.filter-divider {
+  width: 1px;
+  align-self: stretch;
+  background: #e0e0e0;
+  margin: 0.1rem 0;
+}
+
 .filter-clear {
   padding: 0.3rem 0.75rem;
   font-size: 0.85rem;

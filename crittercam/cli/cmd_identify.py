@@ -33,9 +33,9 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument(
         '--threshold',
         type=float,
-        default=0.75,
+        default=0.5,
         metavar='FLOAT',
-        help='cosine similarity threshold for matching existing individuals (default: 0.75)',
+        help='cosine similarity threshold for matching existing individuals (default: 0.5)',
     )
     parser.add_argument(
         '--retry-errors',
@@ -120,11 +120,11 @@ def cmd_identify(args: argparse.Namespace) -> None:
         conn.close()
 
     if args.skip_embedding:
-        print(f'Done: {summary.identified} identified.')
+        print(f'Done: {summary.identified} detections across {summary.individuals} individual(s).')
     else:
         print(
-            f'Done: {summary.embedded} embedded, {summary.identified} identified,'
-            f' {len(summary.errors)} errors.'
+            f'Done: {summary.embedded} embedded, {summary.identified} identified'
+            f' across {summary.individuals} individual(s), {len(summary.errors)} errors.'
         )
         for filename, reason in summary.errors.items():
             print(f'  error — {filename}: {reason}')

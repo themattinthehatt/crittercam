@@ -14,7 +14,7 @@ from crittercam.pipeline.identify import IdentifySummary
 def _args(
     data_root=None,
     species=None,
-    threshold=0.75,
+    threshold=0.5,
     retry_errors=False,
     reidentify_all=False,
     skip_embedding=False,

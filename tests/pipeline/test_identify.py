@@ -10,6 +10,7 @@ from crittercam.pipeline.identify import (
     IdentifySummary,
     _build_species_filter,
     _get_gallery,
+    _next_individual_id,
     enqueue_pending,
     identify_pending,
     match_pending,
@@ -387,15 +388,23 @@ class TestReidentifyAll:
         # Act — reidentify only cats
         reidentify_all(db, species=['felis catus'])
 
-        # Assert — cat cleared, dog untouched
-        cat_row = db.execute(
+        # Assert — cat detection cleared and cat individual row deleted; dog untouched
+        cat_det_row = db.execute(
             'SELECT individual_id FROM detections WHERE id = :id', {'id': cat_det},
         ).fetchone()
-        dog_row = db.execute(
+        cat_ind_row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': cat_iid},
+        ).fetchone()
+        dog_det_row = db.execute(
             'SELECT individual_id FROM detections WHERE id = :id', {'id': dog_det},
         ).fetchone()
-        assert cat_row['individual_id'] is None
-        assert dog_row['individual_id'] == dog_iid
+        dog_ind_row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': dog_iid},
+        ).fetchone()
+        assert cat_det_row['individual_id'] is None
+        assert cat_ind_row is None
+        assert dog_det_row['individual_id'] == dog_iid
+        assert dog_ind_row is not None
 
 
 # ---------------------------------------------------------------------------
@@ -796,15 +805,23 @@ class TestResetAssignments:
         # Act — reset only cats
         reset_assignments(db, species=['felis catus'])
 
-        # Assert — cat cleared, dog untouched
-        cat_row = db.execute(
+        # Assert — cat detection cleared and cat individual row deleted
+        cat_det_row = db.execute(
             'SELECT individual_id FROM detections WHERE id = :id', {'id': cat_det},
         ).fetchone()
-        dog_row = db.execute(
+        cat_ind_row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': cat_iid},
+        ).fetchone()
+        dog_det_row = db.execute(
             'SELECT individual_id FROM detections WHERE id = :id', {'id': dog_det},
         ).fetchone()
-        assert cat_row['individual_id'] is None
-        assert dog_row['individual_id'] == dog_iid
+        dog_ind_row = db.execute(
+            'SELECT id FROM individuals WHERE id = :id', {'id': dog_iid},
+        ).fetchone()
+        assert cat_det_row['individual_id'] is None
+        assert cat_ind_row is None
+        assert dog_det_row['individual_id'] == dog_iid
+        assert dog_ind_row is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1012,6 +1029,53 @@ class TestMatchPending:
 
         # Assert
         assert summary.identified == 0
+
+
+# ---------------------------------------------------------------------------
+# TestNextIndividualId
+# ---------------------------------------------------------------------------
+
+class TestNextIndividualId:
+    """Test the _next_individual_id helper."""
+
+    def test_returns_one_for_empty_table(self, db):
+        assert _next_individual_id(db) == 1
+
+    def test_returns_next_after_contiguous_sequence(self, db):
+        # Arrange
+        _insert_individual(db)  # id 1
+        _insert_individual(db)  # id 2
+        assert _next_individual_id(db) == 3
+
+    def test_fills_gap_at_start(self, db):
+        # Arrange — insert with explicit id 2, leaving 1 free
+        db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (2, 'felis catus', 'now', 'now')"
+        )
+        db.commit()
+        assert _next_individual_id(db) == 1
+
+    def test_fills_interior_gap(self, db):
+        # Arrange — ids 1 and 3 exist; 2 is missing
+        db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (1, 'felis catus', 'now', 'now')"
+        )
+        db.execute(
+            "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
+            " VALUES (3, 'felis catus', 'now', 'now')"
+        )
+        db.commit()
+        assert _next_individual_id(db) == 2
+
+    def test_returns_one_after_all_rows_deleted(self, db):
+        # Arrange — insert then delete; SQLite would normally pick max+1
+        _insert_individual(db)
+        _insert_individual(db)
+        db.execute('DELETE FROM individuals')
+        db.commit()
+        assert _next_individual_id(db) == 1
 
 
 # ---------------------------------------------------------------------------
