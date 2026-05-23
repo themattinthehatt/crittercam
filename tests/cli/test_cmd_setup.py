@@ -1,11 +1,10 @@
 """Tests for crittercam.cli.cmd_setup."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from crittercam.config import Config, load
+from crittercam.config import load
 from crittercam.cli.cmd_setup import cmd_setup
 
 

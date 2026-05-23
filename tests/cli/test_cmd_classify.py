@@ -1,7 +1,6 @@
 """Tests for crittercam.cli.cmd_classify."""
 
 import argparse
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

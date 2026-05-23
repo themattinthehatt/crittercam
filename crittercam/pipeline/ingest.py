@@ -64,7 +64,6 @@ def ingest(
 
     existing_hashes = _load_existing_hashes(conn)
     rows_images = []
-    rows_jobs = []
 
     for path in jpegs:
         try:

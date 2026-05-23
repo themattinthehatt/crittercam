@@ -2,12 +2,11 @@
 
 import argparse
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from crittercam.cli.cmd_ingest import _resolve_deployment, cmd_ingest
-from crittercam.config import Config
 from crittercam.pipeline.exif import ImageMetadata
 from crittercam.pipeline.ingest import IngestSummary
 

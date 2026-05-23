@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from crittercam.pipeline.clean import CleanSummary, CleanTarget, delete_targets, find_targets
+from crittercam.pipeline.clean import delete_targets, find_targets
 
 
 # ---------------------------------------------------------------------------
