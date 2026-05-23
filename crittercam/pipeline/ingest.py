@@ -37,6 +37,7 @@ def ingest(
     source_dir: Path,
     data_root: Path,
     conn: sqlite3.Connection,
+    deployment_id: int | None = None,
 ) -> IngestSummary:
     """Ingest new images from source_dir into the archive.
 
@@ -48,6 +49,8 @@ def ingest(
         source_dir: directory containing images to ingest (e.g. SD card)
         data_root: root of the crittercam data directory
         conn: open database connection
+        deployment_id: primary key of the deployment to associate with ingested
+            media rows, or None to leave deployment_id unset
 
     Returns:
         IngestSummary with counts of ingested, skipped, and errored files
@@ -103,6 +106,7 @@ def ingest(
             'file_size': path.stat().st_size,
             'width': metadata.width,
             'height': metadata.height,
+            'deployment_id': deployment_id,
             'temperature_c': metadata.temperature_c,
             'thumb_path': thumb_rel.as_posix() if thumb_rel else None,
         })
@@ -121,10 +125,12 @@ def ingest(
                     '''
                     INSERT INTO media (
                         path, filename, captured_at, ingested_at, file_hash,
-                        file_size, width, height, temperature_c, thumb_path
+                        file_size, width, height, deployment_id,
+                        temperature_c, thumb_path
                     ) VALUES (
                         :path, :filename, :captured_at, :ingested_at, :file_hash,
-                        :file_size, :width, :height, :temperature_c, :thumb_path
+                        :file_size, :width, :height, :deployment_id,
+                        :temperature_c, :thumb_path
                     )
                     ''',
                     row,
