@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import DetailPanel from './DetailPanel.jsx'
-import FilterBar from './FilterBar.jsx'
+import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 
 export default function DetectionGrid() {
@@ -63,25 +63,31 @@ export default function DetectionGrid() {
   // changing any filter resets to page 1 — if you're on page 3 of unfiltered
   // results, page 3 may not exist in the filtered set.
   // wrapping each setter ensures the page reset and filter change happen together.
-  const handleBrowseModeChange = value => { setBrowseMode(value); setPage(1) }
-  const handleSpeciesChange = value => { setSpecies(value); setPage(1) }
-  const handleIndividualChange = value => { setIndividual(value); setPage(1) }
-  const handleDateFromChange = value => { setDateFrom(value); setPage(1) }
-  const handleDateToChange = value => { setDateTo(value); setPage(1) }
+  // FilterSidebar fires onChange with the full state object — unpack it here
+  // and reset to page 1 on any filter change.
+  const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
+    setBrowseMode(bm)
+    setSpecies(sp)
+    setIndividual(ind)
+    setDateFrom(df)
+    setDateTo(dt)
+    setPage(1)
+  }
 
   return (
     <div className={`browse-layout${selectedId !== null ? ' browse-layout--open' : ''}`}>
-      <div className="detection-grid-container">
-        <FilterBar
-          browseMode={browseMode} onBrowseModeChange={handleBrowseModeChange}
-          species={species} onSpeciesChange={handleSpeciesChange}
-          speciesList={speciesList}
-          individual={individual} onIndividualChange={handleIndividualChange}
-          individualList={individualList}
-          dateFrom={dateFrom} onDateFromChange={handleDateFromChange}
-          dateTo={dateTo} onDateToChange={handleDateToChange}
-        />
+      <FilterSidebar
+        browseMode={browseMode}
+        species={speciesList}
+        selectedSpecies={species}
+        individuals={individualList}
+        selectedIndividual={individual}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onChange={handleFilterChange}
+      />
 
+      <div className="detection-grid-container">
         {result === null ? (
           <div>Loading…</div>
         ) : (

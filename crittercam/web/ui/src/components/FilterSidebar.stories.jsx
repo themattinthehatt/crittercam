@@ -20,10 +20,19 @@ const SPECIES = [
   'red fox',
 ]
 
-export const NoFilters = {
+const INDIVIDUALS = [
+  { id: 1, nickname: 'Mittens' },
+  { id: 2, nickname: null },
+  { id: 3, nickname: 'Bandit' },
+]
+
+export const SpeciesMode = {
   args: {
+    browseMode: 'species',
     species: SPECIES,
     selectedSpecies: '',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '',
     dateFrom: '',
     dateTo: '',
   },
@@ -31,26 +40,47 @@ export const NoFilters = {
 
 export const SpeciesSelected = {
   args: {
+    browseMode: 'species',
     species: SPECIES,
     selectedSpecies: 'raccoon',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '',
     dateFrom: '',
     dateTo: '',
   },
 }
 
-export const DateRangeOnly = {
+export const IndividualMode = {
   args: {
+    browseMode: 'individual',
     species: SPECIES,
     selectedSpecies: '',
-    dateFrom: '2026-03-01',
-    dateTo: '2026-03-31',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '',
+    dateFrom: '',
+    dateTo: '',
   },
 }
 
-export const AllFilters = {
+export const IndividualSelected = {
   args: {
+    browseMode: 'individual',
     species: SPECIES,
-    selectedSpecies: 'domestic cat',
+    selectedSpecies: '',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '1',
+    dateFrom: '',
+    dateTo: '',
+  },
+}
+
+export const WithDateRange = {
+  args: {
+    browseMode: 'species',
+    species: SPECIES,
+    selectedSpecies: '',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '',
     dateFrom: '2026-03-01',
     dateTo: '2026-03-31',
   },

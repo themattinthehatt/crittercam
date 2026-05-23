@@ -6,36 +6,70 @@
 // When any field changes, onChange is called with the full filter state so
 // the parent doesn't need to merge partial updates itself.
 export default function FilterSidebar({
+  browseMode,
   species,
   selectedSpecies,
+  individuals,
+  selectedIndividual,
   dateFrom,
   dateTo,
   onChange,
 }) {
-  const hasFilters = selectedSpecies || dateFrom || dateTo
+  const activeFilter = browseMode === 'species' ? selectedSpecies : selectedIndividual
+  const hasFilters = activeFilter || dateFrom || dateTo
 
   const handleChange = (field, value) => {
-    onChange({ selectedSpecies, dateFrom, dateTo, [field]: value })
+    onChange({ browseMode, selectedSpecies, selectedIndividual, dateFrom, dateTo, [field]: value })
+  }
+
+  // switching modes clears both entity filters so stale values don't carry over
+  const handleModeChange = value => {
+    onChange({ browseMode: value, selectedSpecies: '', selectedIndividual: '', dateFrom, dateTo })
   }
 
   const handleClear = () => {
-    onChange({ selectedSpecies: '', dateFrom: '', dateTo: '' })
+    onChange({ browseMode, selectedSpecies: '', selectedIndividual: '', dateFrom: '', dateTo: '' })
   }
 
   return (
     <div className="filter-sidebar">
       <label className="filter-field">
-        <span className="filter-label">species</span>
-        <select
-          value={selectedSpecies}
-          onChange={e => handleChange('selectedSpecies', e.target.value)}
-        >
-          <option value="">all</option>
-          {species.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+        <span className="filter-label">browse by</span>
+        <select value={browseMode} onChange={e => handleModeChange(e.target.value)}>
+          <option value="species">species</option>
+          <option value="individual">individual</option>
         </select>
       </label>
+
+      {browseMode === 'species' ? (
+        <label className="filter-field">
+          <span className="filter-label">species</span>
+          <select
+            value={selectedSpecies}
+            onChange={e => handleChange('selectedSpecies', e.target.value)}
+          >
+            <option value="">all</option>
+            {species.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <label className="filter-field">
+          <span className="filter-label">individual</span>
+          <select
+            value={selectedIndividual}
+            onChange={e => handleChange('selectedIndividual', e.target.value)}
+          >
+            <option value="">all</option>
+            {individuals.map(ind => (
+              <option key={ind.id} value={String(ind.id)}>
+                {ind.nickname || `#${ind.id}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="filter-field">
         <span className="filter-label">from</span>

@@ -190,6 +190,7 @@ header p {
   display: flex;
   gap: 1.5rem;
   align-items: flex-start;
+  position: relative;
 }
 
 .browse-layout .detection-grid-container {
@@ -356,6 +357,10 @@ header p {
 /* FilterSidebar */
 
 .filter-sidebar {
+  position: absolute;
+  right: calc(100% + 1.5rem);
+  top: 0;
+  width: 160px;
   display: flex;
   flex-direction: column;
   gap: 1rem;
