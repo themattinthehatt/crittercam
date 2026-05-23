@@ -77,7 +77,9 @@ export default function DetailPanel({ detectionId, onClose }) {
           <div className="meta-row" style={{ marginTop: '0.75rem' }}>
             <span className="meta-label">individual</span>
             <span className="meta-value">
-              {detection.nickname || `#${detection.individual_id}`}
+              {detection.nickname
+            ? `${detection.nickname} (id ${detection.individual_id})`
+            : `id ${detection.individual_id}`}
             </span>
           </div>
         )}
