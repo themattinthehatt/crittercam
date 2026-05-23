@@ -117,7 +117,7 @@ to know where to find them.
 
 **Directory structure**:
 ```
-images/
+media/
   YYYY/MM/DD/
     <filename>.jpg          # original, immutable (Decision 003)
 derived/
@@ -151,10 +151,10 @@ and reduces the data that needs to be loaded for browsing.
 - One crop is generated per detection, not per image — an image with two animals
   produces two crop files
 - This reinforces the need for a separate `detections` table (one row per animal
-  per image) distinct from the `images` table (one row per file); each detection
+  per image) distinct from the `media` table (one row per file); each detection
   row holds its own bounding box, confidence, species label, and crop path
 - Images where MegaDetector finds nothing have no detection rows and no crops;
-  they are logged in the `images` table as empty frames
+  they are logged in the `media` table as empty frames
 
 ---
 
@@ -223,7 +223,7 @@ paths means the system survives remounts and makes the dataset portable to anoth
 machine by updating one config value.
 
 **Implications**:
-- `images.path` stores e.g. `images/2026/03/15/IMG_001.jpg`, never an absolute path
+- `media.path` stores e.g. `media/2026/03/15/IMG_001.jpg`, never an absolute path
 - `derived/` paths follow the same convention
 - All pipeline code resolves full paths as `config.data_root / record.path`
 - `data_root` is a required config value, not a default
@@ -234,10 +234,10 @@ machine by updating one config value.
 
 **Date**: 2026-03-27
 **Decision**: Processing state for each algorithm lives in a dedicated `processing_jobs`
-table keyed by (subject, job_type), not as a `status` field on `images`
+table keyed by (subject, job_type), not as a `status` field on `media`
 
 **Considered**:
-- `status` column on `images` — simple, but implicitly assumes one pipeline per image;
+- `status` column on `media` — simple, but implicitly assumes one pipeline per image;
   breaks when a second algorithm (e.g. weather inference) is added
 - `processing_jobs` table — more rows, but scales to any number of algorithms and
   subject types without schema changes
@@ -251,7 +251,7 @@ this. A separate table with one row per (subject, job_type) is the correct model
 ```sql
 CREATE TABLE processing_jobs (
     id           INTEGER PRIMARY KEY,
-    image_id     INTEGER REFERENCES images(id),
+    media_id     INTEGER REFERENCES media(id),
     detection_id INTEGER REFERENCES detections(id),
     job_type     TEXT NOT NULL,
     status       TEXT NOT NULL DEFAULT 'pending',  -- pending | running | done | error
@@ -259,14 +259,14 @@ CREATE TABLE processing_jobs (
     completed_at TEXT,
     error_msg    TEXT,
     CHECK (
-        (image_id IS NOT NULL AND detection_id IS NULL) OR
-        (image_id IS NULL AND detection_id IS NOT NULL)
+        (media_id IS NOT NULL AND detection_id IS NULL) OR
+        (media_id IS NULL AND detection_id IS NOT NULL)
     )
 );
 
 CREATE UNIQUE INDEX idx_jobs_image
-    ON processing_jobs(image_id, job_type)
-    WHERE image_id IS NOT NULL;
+    ON processing_jobs(media_id, job_type)
+    WHERE media_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_jobs_detection
     ON processing_jobs(detection_id, job_type)
@@ -274,11 +274,11 @@ CREATE UNIQUE INDEX idx_jobs_detection
 ```
 
 **Implications**:
-- `images` table has no processing state columns
+- `media` table has no processing state columns
 - `is_empty` (whether a detection run found no animals) is derived at query time from
-  the absence of active detection rows, not stored on `images`
+  the absence of active detection rows, not stored on `media`
 - Adding a new algorithm requires no schema change — only new `job_type` values
-- Jobs can target images (`image_id`) or detection crops (`detection_id`); the CHECK
+- Jobs can target media rows (`media_id`) or detection crops (`detection_id`); the CHECK
   constraint enforces exactly one subject per row
 - Old job rows can be deleted freely; results live in their own tables
 
@@ -836,6 +836,41 @@ crittercam merge-individuals ID [ID ...]   # merges all into the lowest ID
 - The surviving individual's `updated_at` timestamp is refreshed after the merge
 
 ---
+
+## 027 — Deployments table; images renamed to media
+
+**Date**: 2026-05-23
+**Decision**: Add a `deployments` table to support multiple cameras; rename the `images`
+table and `images/` directory to `media` to accommodate future video support.
+
+**Considered**:
+- Storing camera make/model directly on the `media` table (prior design) — redundant when
+  all images from a card share the same hardware; no way to group images by camera/location
+  for per-deployment filtering or statistics
+- A separate `deployments` table referenced by `media.deployment_id` (chosen) — normalises
+  camera metadata out of the per-image row; supports multiple physical cameras naturally;
+  allows filtering/grouping by deployment in queries and the dashboard
+
+**Rationale**: A second camera was added to the backyard deployment. The per-image
+`camera_make`/`camera_model` fields were redundant and could not group images by camera.
+A `deployments` table is the natural normalisation. Renaming `images` → `media` was done
+at the same time to avoid a future disruptive rename when video support is added.
+
+**Deployment selection at ingest time**: `crittercam ingest` now requires the user to
+associate each SD card offload with a deployment. If `--deployment-id` is not supplied,
+an interactive prompt lists existing deployments and offers to create a new one. When
+creating a new deployment, camera make/model are pre-filled from the EXIF of the first
+JPEG in the source directory.
+
+**Applied via**: migration `0003_deployments.sql` (temporary; deleted after application to
+the live database; `0001_initial_schema.sql` updated to reflect the canonical schema).
+
+**Implications**:
+- `media.deployment_id` is nullable — historical rows without a deployment remain valid
+- `location_id` on `deployments` is reserved for a future FK to a locations table if
+  site management becomes necessary
+- `media_type` on `media` defaults to `'image'`; video support can be added without a
+  schema migration
 
 <!-- Add new decisions below this line, incrementing the number -->
 

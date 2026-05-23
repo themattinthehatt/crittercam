@@ -5,32 +5,35 @@
 
 ### Scope
 - Accept a source directory (manually pointed at offloaded SD card contents)
-- Compute SHA-256 hash of each JPEG; skip if hash already exists in `images` table
-- Copy new files into `<data_root>/images/YYYY/MM/DD/`
+- Associate images with a deployment (camera + location); user selects interactively or passes `--deployment-id`; camera make/model pre-filled from EXIF
+- Compute SHA-256 hash of each JPEG; skip if hash already exists in `media` table
+- Copy new files into `<data_root>/media/YYYY/MM/DD/`
 - Extract EXIF metadata (timestamp, filename, size) at ingest time
 - Generate a full-image thumbnail (max 320px) immediately after copying; write to `derived/YYYY/MM/DD/`
-- Insert row into `images` table, including `thumb_path`
+- Insert row into `media` table, including `thumb_path` and `deployment_id`
 - Insert `processing_jobs` row (job_type='detection', status='pending') for each new image
 
 ### Resolved
 - Deduplication key: SHA-256 file hash (Decision 009)
 - Pipeline is batch-triggered (manual), not a continuous watcher (Decision 005)
 - Paths stored relative to data_root (Decision 010)
+- Deployments table added to support multiple cameras (Decision 027)
 
 ### Open questions
 - [ ] How to detect SD card mount reliably on this OS?
 
 ### Done
 - [x] `crittercam setup` — prompts for data_root, writes config, initialises database
-- [x] `crittercam ingest --source PATH` — finds JPEGs, deduplicates by SHA-256, copies to archive, writes DB rows, enqueues detection jobs
+- [x] `crittercam ingest --source PATH [--deployment-id ID]` — finds JPEGs, deduplicates by SHA-256, copies to archive, writes DB rows, enqueues detection jobs; interactive deployment selection when `--deployment-id` is omitted
+- [x] Deployment selection: lists existing deployments; option to create new; camera make/model pre-filled from EXIF of first image in source
 - [x] EXIF extraction — timestamp, dimensions, camera make/model, temperature (Browning UserComment)
 - [x] mtime fallback when EXIF timestamp is absent
 - [x] Destination collision detection (different hash, same filename + date → error, not silent overwrite)
 - [x] Idempotency verified — re-running on the same source produces no duplicates
-- [x] Thumbnail generation at ingest time (max 320px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`); path recorded in `images.thumb_path`
+- [x] Thumbnail generation at ingest time (max 320px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`); path recorded in `media.thumb_path`
 
 ### Completion criteria
-- [x] Point CLI at source directory → images appear in `images/` tree, organized by date
+- [x] Point CLI at source directory → images appear in `media/` tree, organized by date
 - [x] Re-running on the same source adds no duplicates
 - [x] Each new image produces a pending detection job in `processing_jobs`
 - [x] Each new image has a thumbnail in `derived/` and `thumb_path` recorded in DB
@@ -78,7 +81,7 @@
 **Status**: Complete
 
 ### Scope
-- SQLite schema implementation (images, detections, processing_jobs)
+- SQLite schema implementation (deployments, media, detections, processing_jobs)
 - Migration infrastructure
 - CSV / JSON export scripts
 
