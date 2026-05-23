@@ -8,6 +8,7 @@
   <img src="assets/app_screenshot.png" width="90%" />
 </div>
 
+<br>
 
 This is a fun DIY project - for serious camera trap software with similar objectives, see [AddaxAI](https://addaxdatascience.com/addaxai/).
 
