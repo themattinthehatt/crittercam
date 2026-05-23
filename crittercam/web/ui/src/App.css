@@ -313,3 +313,39 @@ header p {
   color: #222;
   text-transform: capitalize;
 }
+
+/* Badge */
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.badge--high {
+  background: #d4edda;
+  color: #1a6b2f;
+}
+
+.badge--medium {
+  background: #fff3cd;
+  color: #7d5a00;
+}
+
+.badge--low {
+  background: #f8d7da;
+  color: #7d1a1a;
+}
+
+.badge--species {
+  background: #e8eaf6;
+  color: #3949ab;
+}
+
+.badge--blank {
+  background: #f0f0f0;
+  color: #666;
+}

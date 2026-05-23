@@ -93,6 +93,14 @@ Vite automatically forwards `/api/*` and `/media/*` requests to the FastAPI serv
 
 Storybook is a tool for building and reviewing UI components in isolation — no running API server or populated database required.
 
+On Linux, Playwright (used by Storybook's test runner) requires system dependencies. Install them once:
+
+```bash
+npx --prefix crittercam/web/ui playwright install chromium --with-deps
+```
+
+Then start Storybook:
+
 ```bash
 npm --prefix crittercam/web/ui run storybook
 ```
