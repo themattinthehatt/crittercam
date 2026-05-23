@@ -2,34 +2,13 @@
 
 Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.
 
-This is a fun DIY project - for serious camera trap software, see [AddaxAI](https://addaxdatascience.com/addaxai/).
+This is a fun DIY project - for serious camera trap software with similar objectives, see [AddaxAI](https://addaxdatascience.com/addaxai/).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for environment setup.
+
+---
 
 ## Setup
-
-### 1. Create a conda environment
-
-```bash
-conda create -n crittercam python=3.12
-conda activate crittercam
-```
-
-### 2. Install the package
-
-From the repo root:
-
-```bash
-pip install -e ".[dev]"
-```
-
-The `-e` flag installs in editable mode so code changes take effect immediately without reinstalling.
-
-### 3. Run the tests
-
-```bash
-pytest
-```
-
-### 4. Configure crittercam
 
 Run the setup command to set the data root (where images and the database will be stored) and initialise the database:
 
@@ -43,39 +22,6 @@ You will be prompted for:
 - **State/province** — abbreviation (e.g. `CT`) for finer-grained geofencing
 
 The config is written to `~/.config/crittercam/config.toml` and can be updated by running `crittercam setup` again.
-
-### 5. Install Node.js (for the web dashboard)
-
-The dashboard frontend requires Node.js. Install it via conda:
-
-```bash
-conda install -n critter -c conda-forge nodejs
-```
-
-Verify the install:
-
-```bash
-node --version   # should print v20 or later
-npm --version
-```
-
-### 6. Install frontend dependencies
-
-From the repo root:
-
-```bash
-npm --prefix crittercam/web/ui install
-```
-
-This downloads the React and Vite packages into `crittercam/web/ui/node_modules/`. Only needed once (and again after pulling changes that update `package.json`).
-
-### 7. Install honcho (dev process manager)
-
-```bash
-pip install honcho
-```
-
-Honcho reads `Procfile.dev` and starts the API server and Vite dev server together with one command.
 
 ---
 
@@ -113,7 +59,7 @@ After ingesting, run species classification on all pending images:
 crittercam classify
 ```
 
-On first run, SpeciesNet will automatically download model weights (~1 GB) from Kaggle — no separate download step or credentials are required. 
+On first run, SpeciesNet will automatically download model weights (~1 GB) from Kaggle — no separate download step or credentials are required.
 Subsequent runs use the cached weights.
 
 Each image produces:
@@ -174,23 +120,9 @@ crittercam name-individual 3 "Mittens"
 
 ### Run the dashboard
 
-**Development** (hot-reloading UI, recommended while building):
-
-```bash
-honcho start -f Procfile.dev
-```
-
-This starts two processes simultaneously:
-- FastAPI/Uvicorn on `http://localhost:8000` — the API
-- Vite on `http://localhost:5173` — the UI (visit this in the browser)
-
-Vite automatically forwards `/api/*` and `/media/*` requests to the FastAPI server, so the browser only needs to know about port 5173.
-
-**Production** (single server, requires a one-time UI build):
-
 ```bash
 crittercam build-ui   # compiles the React app into crittercam/web/ui/dist/
 crittercam serve      # serves API + built UI from a single Uvicorn process
 ```
 
-Then visit `http://localhost:8000`.
+Then visit `http://localhost:8000`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the hot-reloading dev server setup.
