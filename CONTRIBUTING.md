@@ -25,18 +25,18 @@ The `-e` flag installs in editable mode so code changes take effect immediately 
 pytest
 ```
 
-### 4. Install Node.js (for the web dashboard)
+### 4. Install Node.js (for the web dashboard and Storybook)
 
-The dashboard frontend requires Node.js v20+.
+Node.js v22+ is required. Tailwind CSS's native binary (`@tailwindcss/oxide`) must be compiled with the same Node version used to run the app — mismatches cause startup failures.
 
-Install via [nvm](https://github.com/nvm-sh/nvm) to get the latest LTS release:
+Install via [nvm](https://github.com/nvm-sh/nvm):
 
 ```bash
 nvm install 22
 nvm use 22
 ```
 
-Or install via conda if you prefer to keep everything in one environment:
+Or install via conda:
 
 ```bash
 conda install -n critter -c conda-forge "nodejs>=22"
@@ -51,13 +51,19 @@ npm --version
 
 ### 5. Install frontend dependencies
 
-From the repo root:
+**Important:** run this with Node 22 active. If you previously installed with an older Node version, delete `node_modules` and `package-lock.json` first to force a clean recompile of native binaries:
+
+```bash
+cd crittercam/web/ui && rm -rf node_modules package-lock.json && npm install
+```
+
+Otherwise, from the repo root:
 
 ```bash
 npm --prefix crittercam/web/ui install
 ```
 
-This downloads the React, Vite, and Storybook packages into `crittercam/web/ui/node_modules/`. Only needed once (and again after pulling changes that update `package.json`).
+This downloads all frontend packages into `crittercam/web/ui/node_modules/`. Only needed once (and again after pulling changes that update `package.json`).
 
 ---
 
