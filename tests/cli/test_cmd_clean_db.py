@@ -18,12 +18,12 @@ def _args(labels=None, dry_run=False):
     )
 
 
-def _target(image_id=1, detection_id=1):
+def _target(media_id=1, detection_id=1):
     """Build a minimal CleanTarget for use in tests."""
     return CleanTarget(
         detection_id=detection_id,
         crop_path='derived/2026/01/01/img_det001.jpg',
-        image_id=image_id,
+        media_id=media_id,
         image_path='images/2026/01/01/img.jpg',
         thumb_path='derived/2026/01/01/img_thumb.jpg',
     )
@@ -90,7 +90,7 @@ class TestCmdCleanDbDryRun:
 
     def test_dry_run_prints_summary(self, mock_stack, capsys):
         # Arrange
-        mock_stack['find'].return_value = [_target(image_id=1), _target(image_id=2, detection_id=2)]
+        mock_stack['find'].return_value = [_target(media_id=1), _target(media_id=2, detection_id=2)]
 
         # Act
         cmd_clean_db(_args(dry_run=True))
@@ -140,7 +140,7 @@ class TestCmdCleanDbConfirmation:
     def test_proceeds_on_yes(self, mock_stack):
         # Arrange
         mock_stack['find'].return_value = [_target()]
-        mock_stack['delete'].return_value = CleanSummary(detections=1, images=1, raw_images_deleted=1, thumbnails_deleted=1, crops_deleted=1)
+        mock_stack['delete'].return_value = CleanSummary(detections=1, media=1, raw_images_deleted=1, thumbnails_deleted=1, crops_deleted=1)
 
         # Act
         with patch('builtins.input', return_value='y'):
@@ -157,7 +157,7 @@ class TestCmdCleanDbSummary:
         # Arrange
         mock_stack['find'].return_value = [_target()]
         mock_stack['delete'].return_value = CleanSummary(
-            detections=1, images=1,
+            detections=1, media=1,
             raw_images_deleted=1, thumbnails_deleted=1, crops_deleted=1,
         )
 
@@ -179,7 +179,7 @@ class TestCmdCleanDbSummary:
         # Arrange
         mock_stack['find'].return_value = [_target()]
         mock_stack['delete'].return_value = CleanSummary(
-            detections=1, images=1,
+            detections=1, media=1,
             raw_images_deleted=1, thumbnails_deleted=1, crops_deleted=0, files_missing=1,
         )
 
@@ -196,7 +196,7 @@ class TestCmdCleanDbSummary:
         # Arrange
         mock_stack['find'].return_value = [_target()]
         mock_stack['delete'].return_value = CleanSummary(
-            detections=1, images=1,
+            detections=1, media=1,
             raw_images_deleted=1, thumbnails_deleted=1, crops_deleted=1,
         )
 

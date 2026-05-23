@@ -61,7 +61,7 @@ def cmd_clean_db(args: argparse.Namespace) -> None:
             return
 
         n_detections = len(targets)
-        n_images = len({t.image_id for t in targets})
+        n_images = len({t.media_id for t in targets})
         print(
             f'Found {n_detections} active detection(s) across {n_images} image(s) '
             f'matching: {", ".join(labels)}'
@@ -85,7 +85,7 @@ def cmd_clean_db(args: argparse.Namespace) -> None:
 
     total_files = summary.raw_images_deleted + summary.thumbnails_deleted + summary.crops_deleted
     print(
-        f'Done: removed {summary.detections} detection(s) and {summary.images} image(s) '
+        f'Done: removed {summary.detections} detection(s) and {summary.media} image(s) '
         f'from the database, and deleted {total_files} files from disk '
         f'({summary.raw_images_deleted} raw, {summary.thumbnails_deleted} thumbnails, '
         f'{summary.crops_deleted} crops).'

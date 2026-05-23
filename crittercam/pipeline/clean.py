@@ -15,14 +15,14 @@ class CleanTarget:
     Attributes:
         detection_id: primary key of the active detection row
         crop_path: relative path to the detection crop, or None if absent
-        image_id: primary key of the parent image row
+        media_id: primary key of the parent media row
         image_path: relative path to the raw image file
         thumb_path: relative path to the thumbnail, or None if absent
     """
 
     detection_id: int
     crop_path: str | None
-    image_id: int
+    media_id: int
     image_path: str
     thumb_path: str | None
 
@@ -33,7 +33,7 @@ class CleanSummary:
 
     Attributes:
         detections: number of detection rows deleted (includes inactive rows)
-        images: number of image rows deleted
+        media: number of media rows deleted
         raw_images_deleted: number of raw image files deleted from disk
         thumbnails_deleted: number of thumbnail files deleted from disk
         crops_deleted: number of detection crop files deleted from disk
@@ -41,7 +41,7 @@ class CleanSummary:
     """
 
     detections: int = 0
-    images: int = 0
+    media: int = 0
     raw_images_deleted: int = 0
     thumbnails_deleted: int = 0
     crops_deleted: int = 0
@@ -82,9 +82,9 @@ def find_targets(conn: sqlite3.Connection, labels: list[str]) -> list[CleanTarge
     rows = conn.execute(
         f'''
         SELECT d.id AS detection_id, d.crop_path,
-               i.id AS image_id, i.path AS image_path, i.thumb_path
+               i.id AS media_id, i.path AS image_path, i.thumb_path
         FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         WHERE ({where}) AND d.is_active = 1
         ORDER BY i.id
         ''',
@@ -95,7 +95,7 @@ def find_targets(conn: sqlite3.Connection, labels: list[str]) -> list[CleanTarge
         CleanTarget(
             detection_id=row['detection_id'],
             crop_path=row['crop_path'],
-            image_id=row['image_id'],
+            media_id=row['media_id'],
             image_path=row['image_path'],
             thumb_path=row['thumb_path'],
         )
@@ -128,19 +128,19 @@ def delete_targets(
     if not targets:
         return CleanSummary()
 
-    image_ids = [t.image_id for t in targets]
+    image_ids = [t.media_id for t in targets]
     img_params = {f'iid{i}': iid for i, iid in enumerate(image_ids)}
     img_placeholders = ', '.join(f':iid{i}' for i in range(len(image_ids)))
 
     # fetch all detections for these images (including inactive) for complete cleanup
     all_detections = conn.execute(
-        f'SELECT id, crop_path FROM detections WHERE image_id IN ({img_placeholders})',
+        f'SELECT id, crop_path FROM detections WHERE media_id IN ({img_placeholders})',
         img_params,
     ).fetchall()
 
     # delete from DB in FK order: processing_jobs → detections → images
     conn.execute(
-        f'DELETE FROM processing_jobs WHERE image_id IN ({img_placeholders})',
+        f'DELETE FROM processing_jobs WHERE media_id IN ({img_placeholders})',
         img_params,
     )
     if all_detections:
@@ -150,12 +150,12 @@ def delete_targets(
             f'DELETE FROM processing_jobs WHERE detection_id IN ({det_placeholders})',
             det_params,
         )
-    conn.execute(f'DELETE FROM detections WHERE image_id IN ({img_placeholders})', img_params)
-    conn.execute(f'DELETE FROM images WHERE id IN ({img_placeholders})', img_params)
+    conn.execute(f'DELETE FROM detections WHERE media_id IN ({img_placeholders})', img_params)
+    conn.execute(f'DELETE FROM media WHERE id IN ({img_placeholders})', img_params)
     conn.commit()
 
     # delete files by type, tracking hits and misses
-    summary = CleanSummary(detections=len(all_detections), images=len(image_ids))
+    summary = CleanSummary(detections=len(all_detections), media=len(image_ids))
 
     def _delete(path: Path) -> bool:
         """Delete a file and return True if it existed, False if it was missing."""

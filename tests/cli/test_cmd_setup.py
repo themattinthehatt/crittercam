@@ -50,7 +50,7 @@ class TestCmdSetup:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
-        assert {'images', 'detections', 'processing_jobs'}.issubset(tables)
+        assert {'media', 'detections', 'processing_jobs'}.issubset(tables)
         conn.close()
 
     def test_saves_country_and_admin1_region(self, tmp_path, monkeypatch):

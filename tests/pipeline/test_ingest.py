@@ -140,9 +140,8 @@ class TestIngest:
             ingest(source, data_root, db)
 
         # Assert
-        row = db.execute('SELECT * FROM images').fetchone()
+        row = db.execute('SELECT * FROM media').fetchone()
         assert row['filename'] == 'IMG_001.jpg'
-        assert row['camera_make'] == 'BROWNING'
         assert row['temperature_c'] == 12.0
 
     def test_file_copied_to_correct_destination(self, tmp_path, db, make_jpeg):
@@ -156,7 +155,7 @@ class TestIngest:
             ingest(source, data_root, db)
 
         # Assert
-        expected = data_root / 'images' / '2026' / '03' / '15' / 'IMG_001.jpg'
+        expected = data_root / 'media' / '2026' / '03' / '15' / 'IMG_001.jpg'
         assert expected.exists()
 
     def test_processing_job_created(self, tmp_path, db, make_jpeg):
@@ -188,7 +187,7 @@ class TestIngest:
         # Assert — second run skips the duplicate
         assert summary.ingested == 0
         assert summary.skipped == 1
-        assert db.execute('SELECT COUNT(*) FROM images').fetchone()[0] == 1
+        assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 1
 
     def test_mtime_fallback_when_no_exif_timestamp(self, tmp_path, db, make_jpeg):
         # Arrange
@@ -223,7 +222,7 @@ class TestIngest:
 
         # Assert — collision detected, not silently overwritten
         assert 'IMG_001.jpg' in summary.errors
-        assert db.execute('SELECT COUNT(*) FROM images').fetchone()[0] == 1
+        assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 1
 
     def test_empty_source_directory(self, tmp_path, db):
         # Arrange
@@ -250,7 +249,7 @@ class TestIngest:
             ingest(source, data_root, db)
 
         # Assert — thumb_path recorded and file exists on disk
-        row = db.execute('SELECT thumb_path FROM images').fetchone()
+        row = db.execute('SELECT thumb_path FROM media').fetchone()
         assert row['thumb_path'] is not None
         assert (data_root / row['thumb_path']).exists()
 
@@ -265,7 +264,7 @@ class TestIngest:
             ingest(source, data_root, db)
 
         # Assert — thumbnail longest side is at most 320px
-        thumb_path_str = db.execute('SELECT thumb_path FROM images').fetchone()['thumb_path']
+        thumb_path_str = db.execute('SELECT thumb_path FROM media').fetchone()['thumb_path']
         thumb = Image.open(data_root / thumb_path_str)
         assert max(thumb.size) <= 320
 
@@ -276,7 +275,7 @@ class TestGenerateThumbnail:
     def test_writes_thumbnail_file(self, tmp_path, make_jpeg):
         # Arrange
         data_root = tmp_path / 'data'
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(640, 480))
 
@@ -290,7 +289,7 @@ class TestGenerateThumbnail:
     def test_returns_path_relative_to_data_root(self, tmp_path, make_jpeg):
         # Arrange
         data_root = tmp_path / 'data'
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(64, 64))
 
@@ -304,7 +303,7 @@ class TestGenerateThumbnail:
     def test_thumbnail_fits_within_max_size(self, tmp_path, make_jpeg):
         # Arrange
         data_root = tmp_path / 'data'
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(1280, 960))
 
@@ -317,7 +316,7 @@ class TestGenerateThumbnail:
     def test_returns_none_on_missing_file(self, tmp_path):
         # Arrange
         data_root = tmp_path / 'data'
-        image_rel = Path('images/2026/03/15/missing.jpg')
+        image_rel = Path('media/2026/03/15/missing.jpg')
         image_abs = data_root / image_rel  # does not exist
 
         # Act

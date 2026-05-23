@@ -41,7 +41,7 @@ def ingest(
     """Ingest new images from source_dir into the archive.
 
     Walks source_dir recursively, hashes each JPEG, skips any already present
-    in the database, and copies new files into data_root/images/YYYY/MM/DD/.
+    in the database, and copies new files into data_root/media/YYYY/MM/DD/.
     All database writes are committed in a single bulk transaction.
 
     Args:
@@ -78,7 +78,7 @@ def ingest(
 
         metadata = read_exif(path)
         date = _capture_date(metadata, path)
-        dest_rel = Path('images') / f'{date.year:04d}' / f'{date.month:02d}' / f'{date.day:02d}' / path.name
+        dest_rel = Path('media') / f'{date.year:04d}' / f'{date.month:02d}' / f'{date.day:02d}' / path.name
         dest_abs = data_root / dest_rel
 
         if dest_abs.exists():
@@ -103,8 +103,6 @@ def ingest(
             'file_size': path.stat().st_size,
             'width': metadata.width,
             'height': metadata.height,
-            'camera_make': metadata.camera_make,
-            'camera_model': metadata.camera_model,
             'temperature_c': metadata.temperature_c,
             'thumb_path': thumb_rel.as_posix() if thumb_rel else None,
         })
@@ -121,14 +119,12 @@ def ingest(
             for row in rows_images:
                 cursor = conn.execute(
                     '''
-                    INSERT INTO images (
+                    INSERT INTO media (
                         path, filename, captured_at, ingested_at, file_hash,
-                        file_size, width, height, camera_make, camera_model,
-                        temperature_c, thumb_path
+                        file_size, width, height, temperature_c, thumb_path
                     ) VALUES (
                         :path, :filename, :captured_at, :ingested_at, :file_hash,
-                        :file_size, :width, :height, :camera_make, :camera_model,
-                        :temperature_c, :thumb_path
+                        :file_size, :width, :height, :temperature_c, :thumb_path
                     )
                     ''',
                     row,
@@ -138,7 +134,7 @@ def ingest(
 
             conn.executemany(
                 '''
-                INSERT INTO processing_jobs (image_id, job_type, status)
+                INSERT INTO processing_jobs (media_id, job_type, status)
                 VALUES (?, 'detection', 'pending')
                 ''',
                 [(image_id,) for image_id in image_ids],
@@ -191,7 +187,7 @@ def _load_existing_hashes(conn: sqlite3.Connection) -> set[str]:
     Returns:
         set of SHA-256 hex digest strings
     """
-    rows = conn.execute('SELECT file_hash FROM images').fetchall()
+    rows = conn.execute('SELECT file_hash FROM media').fetchall()
     return {row['file_hash'] for row in rows}
 
 
@@ -210,7 +206,7 @@ def _generate_thumbnail(image_abs: Path, image_rel: Path, data_root: Path) -> Pa
         path to the thumbnail relative to data_root, or None on failure
     """
     try:
-        date_part = image_rel.parent.relative_to('images')
+        date_part = image_rel.parent.relative_to('media')
         derived_dir = data_root / 'derived' / date_part
         derived_dir.mkdir(parents=True, exist_ok=True)
         thumb_abs = derived_dir / f'{image_rel.stem}_thumb.jpg'

@@ -30,9 +30,9 @@ def _seed(
         is_active: is_active flag for the detection row
 
     Returns:
-        dict with image_id, detection_id, img_path, thumb_path, crop_path
+        dict with media_id, detection_id, img_path, thumb_path, crop_path
     """
-    img_path = data_root / 'images' / '2026' / '01' / '01' / f'{file_hash}.jpg'
+    img_path = data_root / 'media' / '2026' / '01' / '01' / f'{file_hash}.jpg'
     thumb_path = data_root / 'derived' / '2026' / '01' / '01' / f'{file_hash}_thumb.jpg'
     crop_path = data_root / 'derived' / '2026' / '01' / '01' / f'{file_hash}_det001.jpg'
     make_jpeg(img_path)
@@ -45,7 +45,7 @@ def _seed(
 
     cursor = db.execute(
         '''
-        INSERT INTO images (path, filename, ingested_at, file_hash, file_size, thumb_path)
+        INSERT INTO media (path, filename, ingested_at, file_hash, file_size, thumb_path)
         VALUES (:path, :filename, :ingested_at, :file_hash, :file_size, :thumb_path)
         ''',
         {
@@ -62,11 +62,11 @@ def _seed(
     cursor = db.execute(
         '''
         INSERT INTO detections
-            (image_id, label, confidence, crop_path, model_name, is_active, created_at)
-        VALUES (:image_id, :label, :confidence, :crop_path, :model_name, :is_active, :created_at)
+            (media_id, label, confidence, crop_path, model_name, is_active, created_at)
+        VALUES (:media_id, :label, :confidence, :crop_path, :model_name, :is_active, :created_at)
         ''',
         {
-            'image_id': image_id,
+            'media_id': image_id,
             'label': label,
             'confidence': 0.9,
             'crop_path': crop_rel,
@@ -79,15 +79,15 @@ def _seed(
 
     db.execute(
         '''
-        INSERT INTO processing_jobs (image_id, job_type, status, completed_at)
-        VALUES (:image_id, 'detection', 'done', :completed_at)
+        INSERT INTO processing_jobs (media_id, job_type, status, completed_at)
+        VALUES (:media_id, 'detection', 'done', :completed_at)
         ''',
-        {'image_id': image_id, 'completed_at': '2026-01-01T00:00:00+00:00'},
+        {'media_id': image_id, 'completed_at': '2026-01-01T00:00:00+00:00'},
     )
     db.commit()
 
     return {
-        'image_id': image_id,
+        'media_id': image_id,
         'detection_id': detection_id,
         'img_path': img_path,
         'thumb_path': thumb_path,
@@ -232,7 +232,7 @@ class TestDeleteTargets:
         delete_targets(data_root, db, targets)
 
         # Assert
-        assert db.execute('SELECT COUNT(*) FROM images').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 0
 
     def test_delete_targets_removes_processing_jobs(self, db, data_root, make_jpeg):
         # Arrange
@@ -288,7 +288,7 @@ class TestDeleteTargets:
         delete_targets(data_root, db, targets)
 
         # Assert
-        assert db.execute('SELECT COUNT(*) FROM images').fetchone()[0] == 1
+        assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 1
         assert db.execute('SELECT COUNT(*) FROM detections').fetchone()[0] == 1
         remaining = db.execute('SELECT label FROM detections').fetchone()
         assert remaining['label'].endswith(';deer')
@@ -298,10 +298,10 @@ class TestDeleteTargets:
         row = _seed(db, data_root, make_jpeg, label='abc123;animalia;...;human', file_hash='h1')
         db.execute(
             '''
-            INSERT INTO detections (image_id, label, confidence, model_name, is_active, created_at)
-            VALUES (:image_id, 'human', 0.7, 'old_model', 0, '2025-01-01T00:00:00+00:00')
+            INSERT INTO detections (media_id, label, confidence, model_name, is_active, created_at)
+            VALUES (:media_id, 'human', 0.7, 'old_model', 0, '2025-01-01T00:00:00+00:00')
             ''',
-            {'image_id': row['image_id']},
+            {'media_id': row['media_id']},
         )
         db.commit()
         targets = find_targets(db, ['human'])
@@ -334,7 +334,7 @@ class TestDeleteTargets:
 
         # Assert
         assert summary.detections == 0
-        assert summary.images == 0
+        assert summary.media == 0
         assert summary.raw_images_deleted == 0
         assert summary.thumbnails_deleted == 0
         assert summary.crops_deleted == 0

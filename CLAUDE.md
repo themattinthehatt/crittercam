@@ -131,7 +131,7 @@ foo(
 - Derived assets (thumbnails, detection crops) are written to disk and referenced by path in the DB — never stored as BLOBs
 - Directory structure mirrors the image archive:
   ```
-  images/YYYY/MM/DD/<filename>.jpg          # original, immutable
+  media/YYYY/MM/DD/<filename>.jpg           # original, immutable
   derived/YYYY/MM/DD/<filename>_thumb.jpg   # full-image thumbnail
   derived/YYYY/MM/DD/<filename>_det001.jpg  # crop for detection 1
   derived/YYYY/MM/DD/<filename>_det002.jpg  # crop for detection 2

@@ -64,14 +64,14 @@ def _unit(v: list[float]) -> np.ndarray:
 
 def _insert_image(db, data_root, name='IMG_001.jpg', date='2026/03/15', make_file=True):
     """Insert an images row and optionally create the JPEG on disk."""
-    path_rel = f'images/{date}/{name}'
+    path_rel = f'media/{date}/{name}'
     img_abs = data_root / path_rel
     if make_file:
         img_abs.parent.mkdir(parents=True, exist_ok=True)
         from PIL import Image as PILImage
         PILImage.new('RGB', (64, 64)).save(img_abs, format='JPEG')
     db.execute(
-        'INSERT INTO images (path, filename, ingested_at, file_hash, file_size)'
+        'INSERT INTO media (path, filename, ingested_at, file_hash, file_size)'
         ' VALUES (:path, :filename, :ingested_at, :file_hash, :file_size)',
         {
             'path': path_rel,
@@ -106,11 +106,11 @@ def _insert_detection(
     db.execute(
         '''
         INSERT INTO detections
-            (image_id, label, confidence, crop_path, model_name, is_active, created_at)
-        VALUES (:image_id, :label, :confidence, :crop_path, :model_name, 1, :created_at)
+            (media_id, label, confidence, crop_path, model_name, is_active, created_at)
+        VALUES (:media_id, :label, :confidence, :crop_path, :model_name, 1, :created_at)
         ''',
         {
-            'image_id': image_id,
+            'media_id': image_id,
             'label': label,
             'confidence': 0.9,
             'crop_path': crop_rel,

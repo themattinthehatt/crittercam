@@ -117,7 +117,7 @@ def list_detections(
     total = conn.execute(
         f'''
         SELECT COUNT(*) FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         WHERE {where}
         ''',
         params,
@@ -128,7 +128,7 @@ def list_detections(
         SELECT d.id, d.label, d.confidence, d.crop_path,
                d.individual_id, ind.nickname
         FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
         WHERE {where}
         ORDER BY d.id DESC
@@ -175,7 +175,7 @@ def recent_by_species() -> list[dict]:
         '''
         SELECT d.id, d.label, d.confidence, d.crop_path, i.captured_at
         FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         INNER JOIN (
             SELECT label, MAX(id) AS max_id
             FROM detections
@@ -228,7 +228,7 @@ def get_detection(detection_id: int) -> dict:
                d.individual_id, ind.nickname,
                i.path AS image_path, i.captured_at, i.temperature_c
         FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
         WHERE d.id = :id
           AND d.is_active = 1

@@ -141,7 +141,7 @@ class TestMigrate:
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
-        assert {'images', 'detections', 'processing_jobs'}.issubset(tables)
+        assert {'media', 'deployments', 'detections', 'processing_jobs'}.issubset(tables)
 
     def test_records_applied_version(self, raw_db):
         # Act

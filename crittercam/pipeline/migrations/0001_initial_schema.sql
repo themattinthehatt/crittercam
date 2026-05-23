@@ -1,42 +1,51 @@
--- initial schema: images, detections, processing_jobs
+-- initial schema: deployments, media, detections, processing_jobs
 
-CREATE TABLE images (
+CREATE TABLE deployments (
+    id              INTEGER PRIMARY KEY,
+    deployment_name TEXT,
+    location_id     INTEGER,
+    location_name   TEXT,
+    camera_make     TEXT,
+    camera_model    TEXT
+);
+
+CREATE TABLE media (
     id            INTEGER PRIMARY KEY,
+    deployment_id INTEGER REFERENCES deployments(id),
+    captured_at   TEXT,
     path          TEXT    NOT NULL UNIQUE,
     filename      TEXT    NOT NULL,
-    captured_at   TEXT,
+    media_type    TEXT    NOT NULL DEFAULT 'image',
+    width         INTEGER,
+    height        INTEGER,
     ingested_at   TEXT    NOT NULL,
     file_hash     TEXT    NOT NULL UNIQUE,
     file_size     INTEGER NOT NULL,
-    width         INTEGER,
-    height        INTEGER,
-    camera_make   TEXT,
-    camera_model  TEXT,
     temperature_c REAL,
     thumb_path    TEXT
 );
 
 CREATE TABLE detections (
-    id            INTEGER PRIMARY KEY,
-    image_id      INTEGER NOT NULL REFERENCES images(id),
-    label         TEXT    NOT NULL,
-    confidence    REAL    NOT NULL,
-    bbox_x        REAL,
-    bbox_y        REAL,
-    bbox_w        REAL,
-    bbox_h        REAL,
-    crop_path     TEXT,
-    model_name    TEXT    NOT NULL,
-    model_version TEXT,
-    is_active     INTEGER NOT NULL DEFAULT 1,
-    created_at    TEXT    NOT NULL,
-    label_assigned_by TEXT NOT NULL DEFAULT 'algorithm',
-    label_assigned_at TEXT
+    id                INTEGER PRIMARY KEY,
+    media_id          INTEGER NOT NULL REFERENCES media(id),
+    crop_path         TEXT,
+    bbox_x            REAL,
+    bbox_y            REAL,
+    bbox_w            REAL,
+    bbox_h            REAL,
+    label             TEXT    NOT NULL,
+    confidence        REAL    NOT NULL,
+    label_assigned_at TEXT,
+    label_assigned_by TEXT    NOT NULL DEFAULT 'algorithm',
+    model_name        TEXT    NOT NULL,
+    model_version     TEXT,
+    is_active         INTEGER NOT NULL DEFAULT 1,
+    created_at        TEXT    NOT NULL
 );
 
 CREATE TABLE processing_jobs (
     id           INTEGER PRIMARY KEY,
-    image_id     INTEGER REFERENCES images(id),
+    media_id     INTEGER REFERENCES media(id),
     detection_id INTEGER REFERENCES detections(id),
     job_type     TEXT    NOT NULL,
     status       TEXT    NOT NULL DEFAULT 'pending',
@@ -44,14 +53,14 @@ CREATE TABLE processing_jobs (
     completed_at TEXT,
     error_msg    TEXT,
     CHECK (
-        (image_id IS NOT NULL AND detection_id IS NULL) OR
-        (image_id IS NULL AND detection_id IS NOT NULL)
+        (media_id IS NOT NULL AND detection_id IS NULL) OR
+        (media_id IS NULL AND detection_id IS NOT NULL)
     )
 );
 
 CREATE UNIQUE INDEX idx_jobs_image
-    ON processing_jobs(image_id, job_type)
-    WHERE image_id IS NOT NULL;
+    ON processing_jobs(media_id, job_type)
+    WHERE media_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_jobs_detection
     ON processing_jobs(detection_id, job_type)

@@ -454,7 +454,7 @@ def identify_pending(
                i.filename
         FROM processing_jobs pj
         JOIN detections d ON d.id = pj.detection_id
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         WHERE pj.job_type = 'embedding' AND pj.status = 'pending'
         {('AND ' + species_filter['clause']) if species_filter['clause'] else ''}
         ORDER BY pj.id

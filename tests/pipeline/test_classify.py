@@ -54,27 +54,27 @@ def pending_image(db, data_root, make_jpeg):
 
     Returns a dict with image_id, job_id, filename, and image path.
     """
-    img_path = data_root / 'images' / '2026' / '03' / '15' / 'IMG_001.jpg'
+    img_path = data_root / 'media' / '2026' / '03' / '15' / 'IMG_001.jpg'
     make_jpeg(img_path, size=(64, 64))
 
     db.execute(
         '''
-        INSERT INTO images (path, filename, ingested_at, file_hash, file_size)
+        INSERT INTO media (path, filename, ingested_at, file_hash, file_size)
         VALUES (?, ?, ?, ?, ?)
         ''',
-        ('images/2026/03/15/IMG_001.jpg', 'IMG_001.jpg', '2026-03-15T10:00:00+00:00', 'abc123', 1024),
+        ('media/2026/03/15/IMG_001.jpg', 'IMG_001.jpg', '2026-03-15T10:00:00+00:00', 'abc123', 1024),
     )
     db.commit()
     image_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
 
     db.execute(
-        "INSERT INTO processing_jobs (image_id, job_type, status) VALUES (?, 'detection', 'pending')",
+        "INSERT INTO processing_jobs (media_id, job_type, status) VALUES (?, 'detection', 'pending')",
         (image_id,),
     )
     db.commit()
     job_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
 
-    return {'image_id': image_id, 'job_id': job_id, 'filename': 'IMG_001.jpg', 'path': img_path}
+    return {'media_id': image_id, 'job_id': job_id, 'filename': 'IMG_001.jpg', 'path': img_path}
 
 
 # ---------------------------------------------------------------------------
@@ -158,10 +158,10 @@ class TestClassifyPending:
         db.execute(
             '''
             INSERT INTO detections
-                (image_id, label, confidence, model_name, is_active, created_at)
+                (media_id, label, confidence, model_name, is_active, created_at)
             VALUES (?, 'old_label', 0.5, 'old_model', 1, '2026-01-01T00:00:00+00:00')
             ''',
-            (pending_image['image_id'],),
+            (pending_image['media_id'],),
         )
         db.commit()
         classifier = _MockClassifier([Detection(label='bear', confidence=0.95, bbox=None)])
@@ -194,12 +194,12 @@ class TestClassifyPending:
         db.execute(
             '''
             INSERT INTO detections
-                (image_id, label, confidence, model_name, is_active,
+                (media_id, label, confidence, model_name, is_active,
                  label_assigned_by, created_at)
             VALUES (?, 'human corrected species', 0.0, 'human', 1,
                     'human', '2026-01-01T00:00:00+00:00')
             ''',
-            (pending_image['image_id'],),
+            (pending_image['media_id'],),
         )
         db.commit()
         classifier = _MockClassifier([Detection(label='bear', confidence=0.95, bbox=None)])
@@ -317,17 +317,17 @@ class TestResetErrors:
     def test_returns_count_of_reset_jobs(self, db, data_root, make_jpeg):
         # Arrange — create two errored jobs
         for i, name in enumerate(['A.jpg', 'B.jpg']):
-            img_path = data_root / 'images' / '2026' / '03' / '15' / name
+            img_path = data_root / 'media' / '2026' / '03' / '15' / name
             make_jpeg(img_path)
             db.execute(
-                'INSERT INTO images (path, filename, ingested_at, file_hash, file_size) '
+                'INSERT INTO media (path, filename, ingested_at, file_hash, file_size) '
                 'VALUES (?, ?, ?, ?, ?)',
-                (f'images/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
+                (f'media/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
             )
             db.commit()
             image_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
             db.execute(
-                "INSERT INTO processing_jobs (image_id, job_type, status, error_msg) "
+                "INSERT INTO processing_jobs (media_id, job_type, status, error_msg) "
                 "VALUES (?, 'detection', 'error', 'fail')",
                 (image_id,),
             )
@@ -393,17 +393,17 @@ class TestResetAll:
     def test_returns_total_count(self, db, data_root, make_jpeg):
         # Arrange — one done job and one error job
         for i, (name, status) in enumerate([('A.jpg', 'done'), ('B.jpg', 'error')]):
-            img_path = data_root / 'images' / '2026' / '03' / '15' / name
+            img_path = data_root / 'media' / '2026' / '03' / '15' / name
             make_jpeg(img_path)
             db.execute(
-                'INSERT INTO images (path, filename, ingested_at, file_hash, file_size) '
+                'INSERT INTO media (path, filename, ingested_at, file_hash, file_size) '
                 'VALUES (?, ?, ?, ?, ?)',
-                (f'images/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
+                (f'media/2026/03/15/{name}', name, '2026-03-15T10:00:00+00:00', f'hash{i}', 1024),
             )
             db.commit()
             image_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
             db.execute(
-                "INSERT INTO processing_jobs (image_id, job_type, status) VALUES (?, 'detection', ?)",
+                "INSERT INTO processing_jobs (media_id, job_type, status) VALUES (?, 'detection', ?)",
                 (image_id, status),
             )
             db.commit()
@@ -440,7 +440,7 @@ class TestGenerateCrop:
 
     def test_returns_none_when_no_detection(self, data_root, make_jpeg):
         # Arrange
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(64, 64))
 
@@ -452,7 +452,7 @@ class TestGenerateCrop:
 
     def test_returns_none_when_bbox_is_none(self, data_root, make_jpeg):
         # Arrange
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(64, 64))
         detection = Detection(label='blank', confidence=0.99, bbox=None)
@@ -465,7 +465,7 @@ class TestGenerateCrop:
 
     def test_writes_crop_file_when_bbox_present(self, data_root, make_jpeg):
         # Arrange
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(200, 200))
         detection = Detection(label='deer', confidence=0.9, bbox=(0.1, 0.1, 0.5, 0.5))
@@ -479,7 +479,7 @@ class TestGenerateCrop:
 
     def test_returns_path_relative_to_data_root(self, data_root, make_jpeg):
         # Arrange
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(200, 200))
         detection = Detection(label='deer', confidence=0.9, bbox=(0.1, 0.1, 0.5, 0.5))
@@ -493,7 +493,7 @@ class TestGenerateCrop:
 
     def test_padding_clamped_to_image_boundary(self, data_root, make_jpeg):
         # Arrange — bbox near the edge; large padding would go out of bounds
-        image_rel = Path('images/2026/03/15/IMG_001.jpg')
+        image_rel = Path('media/2026/03/15/IMG_001.jpg')
         image_abs = data_root / image_rel
         make_jpeg(image_abs, size=(200, 200))
         detection = Detection(label='deer', confidence=0.9, bbox=(0.0, 0.0, 0.2, 0.2))

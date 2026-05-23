@@ -18,7 +18,7 @@ def summary() -> dict:
     """
     conn = get_conn()
 
-    total_images = conn.execute('SELECT COUNT(*) FROM images').fetchone()[0]
+    total_images = conn.execute('SELECT COUNT(*) FROM media').fetchone()[0]
 
     total_detections = conn.execute(
         'SELECT COUNT(*) FROM detections WHERE is_active = 1'
@@ -59,7 +59,7 @@ def detections_over_time() -> dict:
         '''
         SELECT d.label, strftime('%Y-%W', i.captured_at) AS week, COUNT(*) AS count
         FROM detections d
-        JOIN images i ON i.id = d.image_id
+        JOIN media i ON i.id = d.media_id
         WHERE d.is_active = 1
           AND d.crop_path IS NOT NULL
           AND LOWER(d.label) NOT LIKE '%blank%'

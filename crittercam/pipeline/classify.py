@@ -55,9 +55,9 @@ def classify_pending(
 
     pending = conn.execute(
         '''
-        SELECT pj.id AS job_id, pj.image_id, i.path, i.filename
+        SELECT pj.id AS job_id, pj.media_id, i.path, i.filename
         FROM processing_jobs pj
-        JOIN images i ON i.id = pj.image_id
+        JOIN media i ON i.id = pj.media_id
         WHERE pj.job_type = 'detection' AND pj.status = 'pending'
         ORDER BY pj.id
         '''
@@ -65,7 +65,7 @@ def classify_pending(
 
     for job in pending:
         job_id = job['job_id']
-        image_id = job['image_id']
+        image_id = job['media_id']
         image_path = data_root / job['path']
         filename = job['filename']
 
@@ -73,9 +73,9 @@ def classify_pending(
         # are permanent and must survive model reruns (mirrors reidentify_all policy)
         human_row = conn.execute(
             "SELECT id FROM detections"
-            " WHERE image_id = :image_id AND is_active = 1"
+            " WHERE media_id = :media_id AND is_active = 1"
             "   AND label_assigned_by = 'human'",
-            {'image_id': image_id},
+            {'media_id': image_id},
         ).fetchone()
         if human_row:
             logger.info(f'skipping {filename}: human label present')
@@ -107,8 +107,8 @@ def classify_pending(
         ts = now()
 
         conn.execute(
-            'UPDATE detections SET is_active = 0 WHERE image_id = :image_id AND is_active = 1',
-            {'image_id': image_id},
+            'UPDATE detections SET is_active = 0 WHERE media_id = :media_id AND is_active = 1',
+            {'media_id': image_id},
         )
 
         if detections:
@@ -117,19 +117,19 @@ def classify_pending(
             conn.execute(
                 '''
                 INSERT INTO detections
-                    (image_id, label, confidence,
+                    (media_id, label, confidence,
                      bbox_x, bbox_y, bbox_w, bbox_h,
                      crop_path, model_name, model_version,
                      label_assigned_by, label_assigned_at,
                      is_active, created_at)
-                VALUES (:image_id, :label, :confidence,
+                VALUES (:media_id, :label, :confidence,
                         :bbox_x, :bbox_y, :bbox_w, :bbox_h,
                         :crop_path, :model_name, :model_version,
                         'algorithm', :label_assigned_at,
                         1, :created_at)
                 ''',
                 {
-                    'image_id': image_id,
+                    'media_id': image_id,
                     'label': det.label,
                     'confidence': det.confidence,
                     'bbox_x': bbox[0] if bbox else None,
@@ -168,7 +168,7 @@ def _generate_crop(
 
     Args:
         image_path: absolute path to the source image
-        image_rel_path: path relative to data_root (e.g. images/2026/03/15/IMG_001.jpg)
+        image_rel_path: path relative to data_root (e.g. media/2026/03/15/IMG_001.jpg)
         data_root: root directory; crop is written under data_root/derived/
         detection: Detection object with bbox for crop generation, or None
         crop_padding: fractional bbox padding for crops
@@ -179,7 +179,7 @@ def _generate_crop(
     if detection is None or detection.bbox is None:
         return None
 
-    date_part = image_rel_path.parent.relative_to('images')
+    date_part = image_rel_path.parent.relative_to('media')
     stem = image_rel_path.stem
     derived_dir = data_root / 'derived' / date_part
     derived_dir.mkdir(parents=True, exist_ok=True)
