@@ -82,11 +82,11 @@ def detections_over_time() -> dict:
         leaf = row['label'].split(';')[-1].lower()
         by_species[leaf][row['week']] += row['count']
 
-    # filter to species with more than 10 total detections in the period
+    # filter to species with at least 100 total detections in the period
     qualifying = {
         species: weeks
         for species, weeks in by_species.items()
-        if sum(weeks.values()) > 10
+        if sum(weeks.values()) >= 50
     }
 
     all_weeks = sorted({week for weeks in qualifying.values() for week in weeks})
@@ -101,6 +101,68 @@ def detections_over_time() -> dict:
 
     return {
         'weeks': all_weeks,
+        'species': species_list,
+        'data': data,
+    }
+
+
+@router.get('/api/stats/activity_by_hour')
+def activity_by_hour() -> dict:
+    """Return hourly detection probability per species for the past year.
+
+    Only species with more than 10 total detections in the period are included
+    (same filter as detections_over_time). Each species' values across the 24
+    one-hour bins sum to 1.0, so the chart shows when during the day each
+    species is active relative to its own total.
+
+    Returns:
+        dict with:
+          - 'species': sorted list of species names
+          - 'data': list of 24 dicts (hours 00:00–23:00), probability per species
+    """
+    conn = get_conn()
+
+    rows = conn.execute(
+        '''
+        SELECT d.label, CAST(strftime('%H', i.captured_at) AS INTEGER) AS hour, COUNT(*) AS count
+        FROM detections d
+        JOIN media i ON i.id = d.media_id
+        WHERE d.is_active = 1
+          AND d.crop_path IS NOT NULL
+          AND LOWER(d.label) NOT LIKE '%blank%'
+          AND LOWER(d.label) NOT LIKE '%human%'
+          AND i.captured_at IS NOT NULL
+          AND i.captured_at >= date('now', '-1 year')
+        GROUP BY d.label, hour
+        ORDER BY hour ASC
+        '''
+    ).fetchall()
+
+    conn.close()
+
+    by_species: dict = defaultdict(lambda: defaultdict(int))
+    for row in rows:
+        leaf = row['label'].split(';')[-1].lower()
+        by_species[leaf][row['hour']] += row['count']
+
+    qualifying = {
+        sp: hours
+        for sp, hours in by_species.items()
+        if sum(hours.values()) >= 50
+    }
+
+    species_list = sorted(qualifying.keys())
+    totals = {sp: sum(hours.values()) for sp, hours in qualifying.items()}
+
+    data = []
+    for h in range(24):
+        row = {'hour': f'{h:02d}:00'}
+        for sp in species_list:
+            count = qualifying[sp].get(h, 0)
+            row[sp] = round(count / totals[sp], 4) if totals[sp] > 0 else 0
+        data.append(row)
+
+    return {
         'species': species_list,
         'data': data,
     }
