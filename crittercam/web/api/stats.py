@@ -148,7 +148,7 @@ def activity_by_hour() -> dict:
     qualifying = {
         sp: hours
         for sp, hours in by_species.items()
-        if sum(hours.values()) >= 100
+        if sum(hours.values()) >= 50
     }
 
     species_list = sorted(qualifying.keys())
