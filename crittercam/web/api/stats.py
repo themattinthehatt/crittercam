@@ -82,11 +82,11 @@ def detections_over_time() -> dict:
         leaf = row['label'].split(';')[-1].lower()
         by_species[leaf][row['week']] += row['count']
 
-    # filter to species with more than 10 total detections in the period
+    # filter to species with at least 100 total detections in the period
     qualifying = {
         species: weeks
         for species, weeks in by_species.items()
-        if sum(weeks.values()) > 10
+        if sum(weeks.values()) >= 50
     }
 
     all_weeks = sorted({week for weeks in qualifying.values() for week in weeks})
@@ -148,7 +148,7 @@ def activity_by_hour() -> dict:
     qualifying = {
         sp: hours
         for sp, hours in by_species.items()
-        if sum(hours.values()) > 10
+        if sum(hours.values()) >= 100
     }
 
     species_list = sorted(qualifying.keys())

@@ -25,7 +25,7 @@ export default function ActivityByHour() {
   if (result === null) return <div>Loading…</div>
 
   if (result.species.length === 0) {
-    return <p className="text-sm text-base-content/60">no species with more than 10 detections in the past year</p>
+    return <p className="text-sm text-base-content/60">no species with at least 50 detections in the past year</p>
   }
 
   return (
