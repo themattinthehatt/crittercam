@@ -13,7 +13,7 @@ function formatTimestamp(iso) {
 // DetectionCard is a presentational component — it receives already-parsed data
 // and renders it. label should be the leaf of the taxonomy string (e.g.
 // 'white-tailed deer'), not the full semicolon-delimited path.
-export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick }) {
+export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick, selected = false }) {
   const isBlank = label === 'blank'
   const timestamp = formatTimestamp(capturedAt)
 
@@ -21,7 +21,7 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
     // The card is a flex column: image-container on top, timestamp below.
     // onClick is passed straight through to the wrapping div so the whole
     // card is clickable, just like a grid cell in DetectionGrid.
-    <div className="detection-card" onClick={onClick}>
+    <div className={`detection-card${selected ? ' detection-card--selected' : ''}`} onClick={onClick}>
       {/* position: relative on the container lets the badge overlays use
           position: absolute to anchor themselves to its corners. */}
       <div className="detection-card__image-container">

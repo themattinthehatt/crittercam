@@ -42,6 +42,16 @@ export const Blank = {
   },
 }
 
+export const Selected = {
+  args: {
+    cropUrl: 'https://placehold.co/300x200',
+    label: 'white-tailed deer',
+    confidence: 0.91,
+    capturedAt: '2026-03-14T02:17:00',
+    selected: true,
+  },
+}
+
 export const LongLabel = {
   args: {
     cropUrl: 'https://placehold.co/300x200',

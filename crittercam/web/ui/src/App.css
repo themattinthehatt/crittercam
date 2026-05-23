@@ -329,6 +329,11 @@ header p {
   overflow: hidden;
 }
 
+.detection-card--selected .detection-card__image {
+  outline: 2px solid #555;
+  outline-offset: 2px;
+}
+
 .detection-card:hover .detection-card__image {
   opacity: 0.85;
 }

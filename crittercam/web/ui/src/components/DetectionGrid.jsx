@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import DetailPanel from './DetailPanel.jsx'
 import FilterBar from './FilterBar.jsx'
+import DetectionCard from './DetectionCard.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
@@ -87,18 +88,15 @@ export default function DetectionGrid() {
           <>
             <div className="detection-grid">
               {result.detections.map(detection => (
-                <div
+                <DetectionCard
                   key={detection.id}
-                  className={`grid-cell${selectedId === detection.id ? ' grid-cell--selected' : ''}`}
+                  cropUrl={detection.crop_url}
+                  label={detection.label.split(';').pop()}
+                  confidence={detection.confidence}
+                  capturedAt={detection.captured_at}
+                  selected={selectedId === detection.id}
                   onClick={() => setSelectedId(detection.id)}
-                >
-                  <img
-                    src={detection.crop_url}
-                    alt={detection.label}
-                    title={`${detection.label} (${(detection.confidence * 100).toFixed(1)}%)`}
-                  />
-                  <div className="grid-cell-label">{detection.label}</div>
-                </div>
+                />
               ))}
             </div>
 
