@@ -872,5 +872,37 @@ the live database; `0001_initial_schema.sql` updated to reflect the canonical sc
 - `media_type` on `media` defaults to `'image'`; video support can be added without a
   schema migration
 
+## 028 — Tailwind CSS v4 + DaisyUI v5 for all UI styling
+
+**Date**: 2026-05-23
+**Decision**: Use Tailwind CSS v4 (via `@tailwindcss/vite`) and DaisyUI v5 for all
+dashboard styling; avoid hand-written custom CSS except for global resets.
+
+**Considered**:
+- Plain CSS with BEM naming — maximum control, zero dependencies, but grows unwieldy as
+  the component library expands; theming and dark mode require significant manual work
+- CSS Modules — scoped styles, no naming collisions, but still requires writing and
+  maintaining all design tokens by hand
+- Other component libraries (shadcn/ui, Radix, MUI) — richer ecosystems, but heavier
+  and opinionated about JavaScript patterns; DaisyUI is CSS-only and maps cleanly onto
+  Tailwind utility classes
+
+**Rationale**: The dashboard is image-heavy and benefits from a polished dark theme.
+DaisyUI's `dim` theme provides this out of the box. Tailwind utility classes keep
+per-component styling co-located in JSX, which is easier to read and change than
+a growing `App.css`. DaisyUI component classes (`btn`, `badge`, `select`, `card`, `tabs`)
+cover the primitives we need without locking us into a JavaScript framework. The
+combination is well-supported by the Vite plugin (`@tailwindcss/vite`), requires no
+config file, and is straightforward to extend.
+
+**Implications**:
+- Node.js 22+ is required — `@tailwindcss/oxide` (Tailwind's native binary) must be
+  compiled with the same Node version used to run the app
+- `App.css` is intentionally minimal: only `@import "tailwindcss"` and the DaisyUI
+  plugin declaration; all component styling lives in `className` strings
+- Custom one-off CSS values use Tailwind arbitrary-value syntax (e.g.
+  `right-[calc(100%+1.5rem)]`) rather than new CSS rules
+- Adding a new DaisyUI theme is a one-line change in `App.css`
+
 <!-- Add new decisions below this line, incrementing the number -->
 

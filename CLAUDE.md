@@ -329,6 +329,34 @@ crittercam/
 - Merge with pull requests
 - Delete merged branches
 
+## Frontend Conventions
+
+### Stack
+- React + Vite (in `crittercam/web/ui/`)
+- Tailwind CSS v4 for layout and utility classes
+- DaisyUI v5 for component classes and theming
+- `dim` is the default theme; `light` is available as an alternate
+- `App.css` is intentionally minimal — just the Tailwind/DaisyUI imports
+- All styles are expressed as `className` strings directly on JSX elements; no CSS modules, no separate stylesheet per component
+
+### Tailwind vs DaisyUI
+- Use DaisyUI classes when a DaisyUI component exists for the element: `btn`, `badge`, `tabs`/`tab`, `select`, `input`, `card`
+- Use DaisyUI color tokens everywhere: `bg-base-100/200/300`, `text-base-content`, `border-base-300`, etc.
+- Use Tailwind utility classes for everything else: layout (`flex`, `grid`, `gap-*`), spacing, typography, positioning
+
+### Component library
+- All UI components live in `crittercam/web/ui/src/components/`
+- Every component has a companion `ComponentName.stories.jsx` in the same directory
+- Storybook component inventory and build order is documented in `design/STORYBOOK.md`
+- Before adding any new visual element to a page, build it as a named component with its own story first
+- Page-level code (`App.jsx`, tab components) only imports from the established component library
+
+### Comments
+- Keep pedagogical comments in component files — the owner is learning React and finds them helpful
+
+### Node.js
+- Node.js v22+ is required for all frontend work; see `CONTRIBUTING.md` for setup
+
 ## Additional Notes
 
 Refer to design/DESIGN.md, design/PHASES.md, and design/DECISIONS.md for architectural
