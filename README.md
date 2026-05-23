@@ -1,8 +1,9 @@
 ![](assets/crittercam_banner.png)
 
-Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.
+[//]: # (Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.)
 
-[//]: # (![]&#40;assets/app_screenshot.png&#41;)
+<h3 align="center">Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard</h3>
+
 <div align="center">
   <img src="assets/app_screenshot.png" width="80%" />
 </div>
