@@ -364,6 +364,14 @@ header p {
   padding: 0 0.1rem;
 }
 
+/* FilterSidebar */
+
+.filter-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 /* Button */
 
 .btn {
