@@ -314,6 +314,43 @@ header p {
   text-transform: capitalize;
 }
 
+/* Button */
+
+.btn {
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.btn--primary {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: #444;
+  border-color: #444;
+}
+
+.btn--ghost {
+  background: #fff;
+  color: #222;
+  border-color: #ccc;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  border-color: #888;
+}
+
 /* Badge */
 
 .badge {
