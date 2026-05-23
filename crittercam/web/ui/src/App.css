@@ -314,6 +314,56 @@ header p {
   text-transform: capitalize;
 }
 
+/* DetectionCard */
+
+.detection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.detection-card__image-container {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.detection-card:hover .detection-card__image {
+  opacity: 0.85;
+}
+
+.detection-card__image {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: contain;
+  display: block;
+  background: #1a1a1a;
+  transition: opacity 0.1s;
+}
+
+.detection-card__image--placeholder {
+  background: #2a2a2a;
+}
+
+.detection-card__overlay-left {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+}
+
+.detection-card__overlay-right {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+}
+
+.detection-card__timestamp {
+  font-size: 0.72rem;
+  color: #999;
+  padding: 0 0.1rem;
+}
+
 /* Button */
 
 .btn {
