@@ -17,7 +17,6 @@ correcting results.
 ## Non-Goals (for now)
 
 - Real-time alerting
-- Multi-camera support
 - Cloud hosting or remote access
 
 ## System Architecture
@@ -41,7 +40,8 @@ The system has a clean physical boundary:
 
 ### Phase 1 — Ingestion
 - Triggered manually when SD card is offloaded (approximately monthly)
-- Copies new files into organized raw store: `images/YYYY/MM/DD/`
+- Associates images with a deployment (camera + location); user selects from a list or creates one interactively; camera make/model pre-filled from EXIF
+- Copies new files into organized raw store: `media/YYYY/MM/DD/`
 - Extracts EXIF metadata (timestamp, camera settings) at ingest time
 - Generates full-image thumbnails, written to `derived/YYYY/MM/DD/`, mirroring the image archive
 - Idempotent: running ingestion twice on the same card does not duplicate images
@@ -57,7 +57,7 @@ The system has a clean physical boundary:
 
 ### Phase 3 — Storage
 - SQLite database holds all detection events and metadata
-- Raw images live in `images/` — immutable, never modified or deleted
+- Raw images live in `media/` — immutable, never modified or deleted
 - Derived assets (thumbnails, crops) live in `derived/` — regenerable at any time
 - Database records paths to derived assets, not the assets themselves
 - Export available at any time: CSV, JSON
@@ -112,7 +112,7 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 
 ```
 <data_root>/                         # external hard drive
-├── images/YYYY/MM/DD/               # raw image archive — immutable
+├── media/YYYY/MM/DD/                # raw image archive — immutable
 ├── derived/YYYY/MM/DD/              # thumbnails and crops — regenerable
 ├── db/crittercam.db                 # SQLite database
 └── exports/                         # CSV / JSON exports
@@ -216,22 +216,38 @@ a single run.
 
 ## Database Schema
 
-### images
+### deployments
+One row per camera deployment (camera + location pairing). Camera make/model are stored
+here rather than per-image, since all images from a single SD card offload share the
+same hardware.
+
+```sql
+CREATE TABLE deployments (
+    id              INTEGER PRIMARY KEY,
+    deployment_name TEXT,             -- optional human-readable name, e.g. 'back_steps'
+    location_id     INTEGER,          -- reserved for future FK to a locations table
+    location_name   TEXT,             -- e.g. '126_willard_backyard'
+    camera_make     TEXT,             -- e.g. 'BROWNING'
+    camera_model    TEXT              -- e.g. 'BTC-8EHP5U'
+);
+```
+
+### media
 One row per file. No processing state — that lives in `processing_jobs`.
 
 ```sql
-CREATE TABLE images (
+CREATE TABLE media (
     id            INTEGER PRIMARY KEY,
+    deployment_id INTEGER REFERENCES deployments(id),
+    captured_at   TEXT,                      -- EXIF DateTimeOriginal, ISO 8601, nullable
     path          TEXT    NOT NULL UNIQUE,   -- relative to data_root
     filename      TEXT    NOT NULL,
-    captured_at   TEXT,                      -- EXIF DateTimeOriginal, ISO 8601, nullable
+    media_type    TEXT    NOT NULL DEFAULT 'image',  -- 'image' | 'video' | 'audio'
+    width         INTEGER,                   -- pixels
+    height        INTEGER,                   -- pixels
     ingested_at   TEXT    NOT NULL,
     file_hash     TEXT    NOT NULL UNIQUE,   -- SHA-256, used for deduplication
     file_size     INTEGER NOT NULL,
-    width         INTEGER,                   -- pixels
-    height        INTEGER,                   -- pixels
-    camera_make   TEXT,                      -- EXIF Make, e.g. 'BROWNING'
-    camera_model  TEXT,                      -- EXIF Model, e.g. 'BTC-8EHP5U'
     temperature_c REAL,                      -- ambient temp from EXIF UserComment
     thumb_path    TEXT                       -- relative to data_root
 );
@@ -243,18 +259,20 @@ One row per animal per image, per model run.
 ```sql
 CREATE TABLE detections (
     id                       INTEGER PRIMARY KEY,
-    image_id                 INTEGER NOT NULL REFERENCES images(id),
-    label                    TEXT NOT NULL,
-    confidence               REAL NOT NULL,
+    media_id                 INTEGER NOT NULL REFERENCES media(id),
+    crop_path                TEXT,            -- relative to data_root
     bbox_x                   REAL,            -- normalized (x, y, w, h) in [0, 1]
     bbox_y                   REAL,
     bbox_w                   REAL,
     bbox_h                   REAL,
-    crop_path                TEXT,            -- relative to data_root
-    model_name               TEXT NOT NULL,
+    label                    TEXT    NOT NULL,
+    confidence               REAL    NOT NULL,
+    label_assigned_at        TEXT,
+    label_assigned_by        TEXT    NOT NULL DEFAULT 'algorithm',
+    model_name               TEXT    NOT NULL,
     model_version            TEXT,
     is_active                INTEGER NOT NULL DEFAULT 1,
-    created_at               TEXT NOT NULL,
+    created_at               TEXT    NOT NULL,
     -- Phase 5 re-identification columns (added by migration 0002)
     embedding_path           TEXT,            -- relative to data_root; .npy file
     reid_model_name          TEXT,
@@ -305,7 +323,7 @@ tables. Rows can be pruned freely without affecting results.
 ```sql
 CREATE TABLE processing_jobs (
     id           INTEGER PRIMARY KEY,
-    image_id     INTEGER REFERENCES images(id),
+    media_id     INTEGER REFERENCES media(id),
     detection_id INTEGER REFERENCES detections(id),
     job_type     TEXT NOT NULL,
     status       TEXT NOT NULL DEFAULT 'pending',
@@ -313,14 +331,14 @@ CREATE TABLE processing_jobs (
     completed_at TEXT,
     error_msg    TEXT,
     CHECK (
-        (image_id IS NOT NULL AND detection_id IS NULL) OR
-        (image_id IS NULL AND detection_id IS NOT NULL)
+        (media_id IS NOT NULL AND detection_id IS NULL) OR
+        (media_id IS NULL AND detection_id IS NOT NULL)
     )
 );
 
 CREATE UNIQUE INDEX idx_jobs_image
-    ON processing_jobs(image_id, job_type)
-    WHERE image_id IS NOT NULL;
+    ON processing_jobs(media_id, job_type)
+    WHERE media_id IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_jobs_detection
     ON processing_jobs(detection_id, job_type)

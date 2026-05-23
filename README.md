@@ -89,6 +89,16 @@ After offloading your SD card to a local directory, run:
 crittercam ingest --source /path/to/offloaded/images
 ```
 
+If `--deployment-id` is not supplied, an interactive prompt lists your existing deployments
+and offers to create a new one. When creating a new deployment, camera make and model are
+pre-filled from the EXIF data of the first image in the source directory.
+
+To skip the prompt by specifying a deployment directly:
+
+```bash
+crittercam ingest --source /path/to/offloaded/images --deployment-id 1
+```
+
 To override the configured data root for a single run:
 
 ```bash
@@ -149,7 +159,8 @@ The default threshold is `0.5`, calibrated on domestic cat detections. Human-con
 (merges, name corrections) are preserved as gallery anchors across re-matching runs.
 
 **Merge individuals** that the algorithm split incorrectly — all reassigned detections are marked as
-human-confirmed and will survive future re-matching:
+human-confirmed and will survive future re-matching. Individual IDs are shown in the dashboard
+detail panel (click any crop to open it):
 
 ```bash
 crittercam merge-individuals 3 7 12   # merges #7 and #12 into #3 (the lowest id)
