@@ -76,7 +76,7 @@ export default function DetectionGrid() {
   }
 
   return (
-    <div className={`browse-layout${selectedId !== null ? ' browse-layout--open' : ''}`}>
+    <div className="flex gap-6 items-start relative">
       <FilterSidebar
         browseMode={browseMode}
         species={speciesList}
@@ -88,12 +88,12 @@ export default function DetectionGrid() {
         onChange={handleFilterChange}
       />
 
-      <div className="detection-grid-container">
+      <div className="flex-1 min-w-0">
         {result === null ? (
           <div>Loading…</div>
         ) : (
           <>
-            <div className="detection-grid">
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
               {result.detections.map(detection => (
                 <DetectionCard
                   key={detection.id}
@@ -107,14 +107,14 @@ export default function DetectionGrid() {
               ))}
             </div>
 
-            <div className="pagination">
+            <div className="flex items-center justify-center gap-4 mt-5">
               <Button
                 label="← prev"
                 variant="ghost"
                 onClick={() => setPage(p => p - 1)}
                 disabled={page === 1}
               />
-              <span className="pagination-info">
+              <span className="text-sm text-base-content/60">
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
               <Button

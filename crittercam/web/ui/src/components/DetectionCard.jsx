@@ -21,19 +21,19 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
     // The card is a flex column: image-container on top, timestamp below.
     // onClick is passed straight through to the wrapping div so the whole
     // card is clickable, just like a grid cell in DetectionGrid.
-    <div className={`detection-card${selected ? ' detection-card--selected' : ''}`} onClick={onClick}>
+    <div className="flex flex-col gap-1.5 cursor-pointer" onClick={onClick}>
       {/* position: relative on the container lets the badge overlays use
           position: absolute to anchor themselves to its corners. */}
-      <div className="detection-card__image-container">
+      <div className={`relative rounded overflow-hidden ${selected ? 'ring-2 ring-base-content/50' : ''}`}>
         {cropUrl
-          ? <img className="detection-card__image" src={cropUrl} alt={label} />
-          : <div className="detection-card__image detection-card__image--placeholder" />
+          ? <img className="w-full aspect-[3/2] object-contain block bg-base-300 hover:opacity-90 transition-opacity duration-100" src={cropUrl} alt={label} />
+          : <div className="w-full aspect-[3/2] bg-base-200" />
         }
-        <span className="detection-card__overlay-left">
+        <span className="absolute top-1.5 left-1.5">
           <Badge label={label} variant={isBlank ? 'blank' : 'species'} />
         </span>
         {!isBlank && (
-          <span className="detection-card__overlay-right">
+          <span className="absolute top-1.5 right-1.5">
             <Badge
               label={`${Math.round(confidence * 100)}%`}
               variant="confidence"
@@ -43,7 +43,7 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
         )}
       </div>
       {timestamp && (
-        <span className="detection-card__timestamp">{timestamp}</span>
+        <span className="text-xs text-base-content/40 px-0.5">{timestamp}</span>
       )}
     </div>
   )
