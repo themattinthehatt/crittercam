@@ -5,6 +5,7 @@ import {
   Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
+import ChartPanel from './ChartPanel'
 
 // categorical color palette — cycles if there are more species than colors
 const COLORS = [
@@ -28,9 +29,7 @@ export default function DetectionsOverTime() {
   }
 
   return (
-    <div className="detections-over-time">
-      <h2 className="section-heading">detections per week — past year</h2>
-
+    <ChartPanel title="detections per week — past year">
       {/* ResponsiveContainer makes the chart fill its parent's width.
           The 100% width + fixed height is the standard Recharts pattern. */}
       <ResponsiveContainer width="100%" height={400}>
@@ -57,6 +56,6 @@ export default function DetectionsOverTime() {
           ))}
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </ChartPanel>
   )
 }
