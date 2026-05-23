@@ -2,7 +2,7 @@ const TABS = ['home', 'browse', 'analytics']
 
 export default function TabShell({ activeTab, onTabChange, children }) {
   return (
-    <div className="max-w-4xl mx-auto px-8 py-8">
+    <div className="max-w-5xl mx-auto px-8 py-8">
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold mb-1">crittercam</h1>
         <p className="text-base-content/60">Wildlife detection dashboard</p>
