@@ -26,13 +26,13 @@ export default function StatsBar() {
 
   // While the fetch is in flight, stats is still null — render a placeholder.
   if (stats === null) {
-    return <div className="stats-bar">Loading…</div>
+    return <div className="flex gap-8 justify-center">Loading…</div>
   }
 
   // StatsBar is a container component: it owns the fetch and passes values down.
   // StatCard is a presentational component: it just renders what it receives.
   return (
-    <div className="stats-bar">
+    <div className="flex gap-8 justify-center">
       <StatCard value={stats.total_images} label="images" />
       <StatCard value={stats.total_detections} label="detections" />
       <StatCard value={stats.species_seen} label="species" />

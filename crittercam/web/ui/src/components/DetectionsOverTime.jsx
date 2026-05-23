@@ -25,7 +25,7 @@ export default function DetectionsOverTime() {
   if (result === null) return <div>Loading…</div>
 
   if (result.species.length === 0) {
-    return <p className="placeholder">no species with more than 10 detections in the past year</p>
+    return <p className="text-sm text-base-content/60">no species with more than 10 detections in the past year</p>
   }
 
   return (
@@ -36,10 +36,10 @@ export default function DetectionsOverTime() {
         <LineChart data={result.data} margin={{ top: 8, right: 24, bottom: 8, left: 0 }}>
           <XAxis
             dataKey="week"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: 'currentColor' }}
             interval="preserveStartEnd"
           />
-          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+          <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} allowDecimals={false} />
           <Tooltip />
           <Legend />
 

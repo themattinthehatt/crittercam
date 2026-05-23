@@ -15,9 +15,11 @@ export default function RecentBySpecies() {
   }
 
   return (
-    <div className="recent-by-species">
-      <h2 className="section-heading">most recent by species</h2>
-      <div className="detection-grid">
+    <div className="mt-8">
+      <h2 className="text-xs uppercase tracking-widest text-base-content/60 mb-3 font-normal">
+        most recent by species
+      </h2>
+      <div className="grid grid-cols-4 gap-3">
         {detections.map(det => (
           <DetectionCard
             key={det.id}

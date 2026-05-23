@@ -4,8 +4,8 @@
 // the block body. Any chart (or anything else) can be dropped inside.
 export default function ChartPanel({ title, children }) {
   return (
-    <div className="chart-panel">
-      <h2 className="chart-panel__title">{title}</h2>
+    <div className="card bg-base-200 border border-base-300 p-5">
+      <h2 className="text-xs uppercase tracking-widest text-base-content/60 font-normal mb-4">{title}</h2>
       {children}
     </div>
   )

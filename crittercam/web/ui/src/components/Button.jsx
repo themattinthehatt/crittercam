@@ -4,7 +4,7 @@
 export default function Button({ label, onClick, variant = 'primary', disabled = false }) {
   return (
     <button
-      className={`btn btn--${variant}`}
+      className={`btn ${variant === 'primary' ? 'btn-primary' : 'btn-ghost'}`}
       onClick={onClick}
       disabled={disabled}
     >

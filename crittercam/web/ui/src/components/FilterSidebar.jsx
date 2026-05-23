@@ -5,6 +5,9 @@
 //
 // When any field changes, onChange is called with the full filter state so
 // the parent doesn't need to merge partial updates itself.
+//
+// The sidebar is absolutely positioned to the left of its containing
+// browse-layout div, outside the centered content area.
 export default function FilterSidebar({
   browseMode,
   species,
@@ -32,19 +35,24 @@ export default function FilterSidebar({
   }
 
   return (
-    <div className="filter-sidebar">
-      <label className="filter-field">
-        <span className="filter-label">browse by</span>
-        <select value={browseMode} onChange={e => handleModeChange(e.target.value)}>
+    <div className="absolute top-0 right-[calc(100%+1.5rem)] w-40 flex flex-col gap-4">
+      <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-base-content/50">browse by</span>
+        <select
+          className="select select-sm select-bordered w-full"
+          value={browseMode}
+          onChange={e => handleModeChange(e.target.value)}
+        >
           <option value="species">species</option>
           <option value="individual">individual</option>
         </select>
       </label>
 
       {browseMode === 'species' ? (
-        <label className="filter-field">
-          <span className="filter-label">species</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-base-content/50">species</span>
           <select
+            className="select select-sm select-bordered w-full"
             value={selectedSpecies}
             onChange={e => handleChange('selectedSpecies', e.target.value)}
           >
@@ -55,9 +63,10 @@ export default function FilterSidebar({
           </select>
         </label>
       ) : (
-        <label className="filter-field">
-          <span className="filter-label">individual</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-base-content/50">individual</span>
           <select
+            className="select select-sm select-bordered w-full"
             value={selectedIndividual}
             onChange={e => handleChange('selectedIndividual', e.target.value)}
           >
@@ -71,18 +80,20 @@ export default function FilterSidebar({
         </label>
       )}
 
-      <label className="filter-field">
-        <span className="filter-label">from</span>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-base-content/50">from</span>
         <input
+          className="input input-sm input-bordered w-full"
           type="date"
           value={dateFrom}
           onChange={e => handleChange('dateFrom', e.target.value)}
         />
       </label>
 
-      <label className="filter-field">
-        <span className="filter-label">to</span>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-base-content/50">to</span>
         <input
+          className="input input-sm input-bordered w-full"
           type="date"
           value={dateTo}
           onChange={e => handleChange('dateTo', e.target.value)}
@@ -90,7 +101,7 @@ export default function FilterSidebar({
       </label>
 
       {hasFilters && (
-        <button className="filter-clear" onClick={handleClear}>
+        <button className="btn btn-sm btn-ghost self-start" onClick={handleClear}>
           clear filters
         </button>
       )}
