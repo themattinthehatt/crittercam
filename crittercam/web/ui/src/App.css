@@ -364,6 +364,23 @@ header p {
   padding: 0 0.1rem;
 }
 
+/* ChartPanel */
+
+.chart-panel {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+}
+
+.chart-panel__title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  font-weight: normal;
+  margin: 0 0 1rem 0;
+}
+
 /* FilterSidebar */
 
 .filter-sidebar {
