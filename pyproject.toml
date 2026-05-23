@@ -20,7 +20,9 @@ crittercam = "crittercam.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
+    "ruff",
 ]
 
 [tool.setuptools.packages.find]
