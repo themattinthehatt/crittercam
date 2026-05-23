@@ -6,6 +6,10 @@ export default function DetectionGrid() {
   const [page, setPage] = useState(1)
   const [result, setResult] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  // selectedDetection holds the full object for whichever grid cell is open.
+  // DetailPanel is now presentational — it receives this object directly
+  // rather than fetching by ID itself.
+  const [selectedDetection, setSelectedDetection] = useState(null)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -28,6 +32,14 @@ export default function DetectionGrid() {
       .then(r => r.json())
       .then(data => setIndividualList(data))
   }, [])  // [] means run once when the component first mounts, never again
+
+  // fetch the full detection object whenever the selected grid cell changes.
+  useEffect(() => {
+    if (selectedId === null) { setSelectedDetection(null); return }
+    fetch(`/api/detections/${selectedId}`)
+      .then(r => r.json())
+      .then(data => setSelectedDetection(data))
+  }, [selectedId])
 
   // re-fetch whenever page or any filter changes.
   // URLSearchParams builds the query string cleanly: it only adds a key
@@ -108,9 +120,9 @@ export default function DetectionGrid() {
         )}
       </div>
 
-      {selectedId !== null && (
+      {selectedDetection !== null && (
         <DetailPanel
-          detectionId={selectedId}
+          detection={selectedDetection}
           onClose={() => setSelectedId(null)}
         />
       )}

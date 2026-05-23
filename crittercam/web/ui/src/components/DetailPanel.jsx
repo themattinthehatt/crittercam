@@ -1,22 +1,6 @@
-import { useState, useEffect } from 'react'
-
-export default function DetailPanel({ detectionId, onClose }) {
-  const [detection, setDetection] = useState(null)
-
-  // Re-fetch whenever detectionId changes — same pattern as DetectionGrid.
-  // detectionId is in the dependency array so clicking a different thumbnail
-  // triggers a new fetch without unmounting and remounting the component.
-  useEffect(() => {
-    setDetection(null)
-    fetch(`/api/detections/${detectionId}`)
-      .then(r => r.json())
-      .then(data => setDetection(data))
-  }, [detectionId])
-
-  if (detection === null) {
-    return <div className="detail-panel">Loading…</div>
-  }
-
+// DetailPanel is a presentational component — it receives a fully-loaded
+// detection object and renders it. The parent (DetectionGrid) owns the fetch.
+export default function DetailPanel({ detection, onClose }) {
   // label is stored as a semicolon-joined taxonomy path like
   // "animalia;chordata;mammalia;...;vulpes vulpes"; take only the last part.
   const label = detection.label.split(';').pop()
@@ -25,18 +9,20 @@ export default function DetailPanel({ detectionId, onClose }) {
     <div className="detail-panel">
       <button className="detail-close" onClick={onClose}>✕</button>
 
-      {/* crop thumbnail */}
-      <img className="detail-crop" src={detection.crop_url} alt={label} />
+      {/* crop thumbnail — omitted for blank frames */}
+      {detection.crop_url && (
+        <img className="detail-crop" src={detection.crop_url} alt={label} />
+      )}
 
-      {/* full image with SVG bounding box drawn on top */}
+      {/* full image with SVG bounding box drawn on top.
+          SVG sits absolutely over the img — see App.css .bbox-overlay.
+          viewBox="0 0 1 1" maps the coordinate space to [0,1] in both axes,
+          matching the normalized bbox values stored in the database.
+          preserveAspectRatio="none" stretches the SVG to fill the element
+          exactly so the rect lines up with the image content. */}
       <div className="detail-fullimage">
         <img src={detection.image_url} alt="full frame" />
         {detection.bbox && (
-          // The SVG is positioned absolutely over the img. viewBox="0 0 1 1"
-          // maps the coordinate space to [0, 1] in both axes, matching the
-          // normalized bbox coordinates stored in the database.
-          // preserveAspectRatio="none" stretches the SVG to fill the element
-          // exactly, so the bbox lines up with the image content.
           <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="bbox-overlay">
             <rect
               x={detection.bbox.x}
@@ -78,8 +64,8 @@ export default function DetailPanel({ detectionId, onClose }) {
             <span className="meta-label">individual</span>
             <span className="meta-value">
               {detection.nickname
-            ? `${detection.nickname} (id ${detection.individual_id})`
-            : `id ${detection.individual_id}`}
+                ? `${detection.nickname} (id ${detection.individual_id})`
+                : `id ${detection.individual_id}`}
             </span>
           </div>
         )}
