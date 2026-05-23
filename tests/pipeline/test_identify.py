@@ -7,7 +7,6 @@ import pytest
 
 from crittercam.identifier.base import Embedding
 from crittercam.pipeline.identify import (
-    IdentifySummary,
     _build_species_filter,
     _get_gallery,
     _next_individual_id,
@@ -582,7 +581,7 @@ class TestIdentifyPendingMatching:
         img2_id = _insert_image(db, data_root, 'IMG_002.jpg')
         det2_id = _insert_detection(db, data_root, img2_id, name='IMG_002')
         gallery_vec = _unit([1, 0, 0, 0])
-        emb_rel = _write_embedding(data_root, f'derived/2026/03/15/IMG_002_det001.jpg', gallery_vec)
+        emb_rel = _write_embedding(data_root, 'derived/2026/03/15/IMG_002_det001.jpg', gallery_vec)
         db.execute(
             "UPDATE detections SET embedding_path = :ep, individual_id = :iid,"
             " individual_assigned_by = 'algorithm' WHERE id = :did",
@@ -611,7 +610,7 @@ class TestIdentifyPendingMatching:
         ind_id = _insert_individual(db)
         img2_id = _insert_image(db, data_root, 'IMG_002.jpg')
         det2_id = _insert_detection(db, data_root, img2_id, name='IMG_002')
-        emb_rel = _write_embedding(data_root, f'derived/2026/03/15/IMG_002_det001.jpg', _unit([1, 0, 0, 0]))
+        emb_rel = _write_embedding(data_root, 'derived/2026/03/15/IMG_002_det001.jpg', _unit([1, 0, 0, 0]))
         db.execute(
             "UPDATE detections SET embedding_path = :ep, individual_id = :iid,"
             " individual_assigned_by = 'algorithm' WHERE id = :did",
@@ -1212,9 +1211,9 @@ class TestMergeIndividuals:
         image_id = _insert_image(db, data_root, f'{name}.jpg')
         det_id = _insert_detection(db, data_root, image_id, name=name)
         db.execute(
-            f"UPDATE detections SET individual_id = :iid, individual_assigned_by = :by,"
-            f" individual_assigned_at = 'now', individual_similarity = 0.9"
-            f' WHERE id = :did',
+            "UPDATE detections SET individual_id = :iid, individual_assigned_by = :by,"
+            " individual_assigned_at = 'now', individual_similarity = 0.9"
+            ' WHERE id = :did',
             {'iid': individual_id, 'by': assigned_by, 'did': det_id},
         )
         db.commit()
@@ -1234,10 +1233,10 @@ class TestMergeIndividuals:
 
     def test_target_is_lowest_id(self, db, data_root):
         # Arrange — insert in non-sequential order
-        ind5 = db.execute(
+        db.execute(
             "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
             " VALUES (5, 'felis catus', 'now', 'now')"
-        ) and db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        )
         db.execute(
             "INSERT INTO individuals (id, species_leaf, created_at, updated_at)"
             " VALUES (2, 'felis catus', 'now', 'now')"

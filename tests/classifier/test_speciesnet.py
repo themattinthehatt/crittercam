@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from crittercam.classifier.base import Detection
 
 _MOCK_PIL_IMAGE = MagicMock(name='pil_image')
 
