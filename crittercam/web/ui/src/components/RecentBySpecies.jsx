@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import DetectionCard from './DetectionCard'
 
 export default function RecentBySpecies() {
   const [detections, setDetections] = useState(null)
@@ -18,15 +19,13 @@ export default function RecentBySpecies() {
       <h2 className="section-heading">most recent by species</h2>
       <div className="detection-grid">
         {detections.map(det => (
-          <div key={det.id} className="grid-cell">
-            <img
-              src={det.crop_url}
-              alt={det.label}
-              title={`${det.label} (${(det.confidence * 100).toFixed(1)}%)`}
-            />
-            <div className="grid-cell-label">{det.label}</div>
-            <div className="grid-cell-date">{det.captured_at?.split(' ')[0]}</div>
-          </div>
+          <DetectionCard
+            key={det.id}
+            cropUrl={det.crop_url}
+            label={det.label}
+            confidence={det.confidence}
+            capturedAt={det.captured_at}
+          />
         ))}
       </div>
     </div>

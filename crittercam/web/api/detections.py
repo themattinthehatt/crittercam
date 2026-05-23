@@ -126,7 +126,7 @@ def list_detections(
     rows = conn.execute(
         f'''
         SELECT d.id, d.label, d.confidence, d.crop_path,
-               d.individual_id, ind.nickname
+               d.individual_id, ind.nickname, i.captured_at
         FROM detections d
         JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
@@ -148,6 +148,7 @@ def list_detections(
                 'crop_url': f'/media/{row["crop_path"]}',
                 'individual_id': row['individual_id'],
                 'nickname': row['nickname'],
+                'captured_at': row['captured_at'],
             }
             for row in rows
         ],

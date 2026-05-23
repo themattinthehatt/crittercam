@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react'
 import DetailPanel from './DetailPanel.jsx'
-import FilterBar from './FilterBar.jsx'
+import FilterSidebar from './FilterSidebar.jsx'
+import DetectionCard from './DetectionCard.jsx'
+import Button from './Button.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
   const [result, setResult] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  // selectedDetection holds the full object for whichever grid cell is open.
+  // DetailPanel is now presentational — it receives this object directly
+  // rather than fetching by ID itself.
+  const [selectedDetection, setSelectedDetection] = useState(null)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -29,6 +35,14 @@ export default function DetectionGrid() {
       .then(data => setIndividualList(data))
   }, [])  // [] means run once when the component first mounts, never again
 
+  // fetch the full detection object whenever the selected grid cell changes.
+  useEffect(() => {
+    if (selectedId === null) { setSelectedDetection(null); return }
+    fetch(`/api/detections/${selectedId}`)
+      .then(r => r.json())
+      .then(data => setSelectedDetection(data))
+  }, [selectedId])
+
   // re-fetch whenever page or any filter changes.
   // URLSearchParams builds the query string cleanly: it only adds a key
   // when we append it, so omitted filters don't appear in the URL at all.
@@ -50,67 +64,73 @@ export default function DetectionGrid() {
   // changing any filter resets to page 1 — if you're on page 3 of unfiltered
   // results, page 3 may not exist in the filtered set.
   // wrapping each setter ensures the page reset and filter change happen together.
-  const handleBrowseModeChange = value => { setBrowseMode(value); setPage(1) }
-  const handleSpeciesChange = value => { setSpecies(value); setPage(1) }
-  const handleIndividualChange = value => { setIndividual(value); setPage(1) }
-  const handleDateFromChange = value => { setDateFrom(value); setPage(1) }
-  const handleDateToChange = value => { setDateTo(value); setPage(1) }
+  // FilterSidebar fires onChange with the full state object — unpack it here
+  // and reset to page 1 on any filter change.
+  const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
+    setBrowseMode(bm)
+    setSpecies(sp)
+    setIndividual(ind)
+    setDateFrom(df)
+    setDateTo(dt)
+    setPage(1)
+  }
 
   return (
     <div className={`browse-layout${selectedId !== null ? ' browse-layout--open' : ''}`}>
-      <div className="detection-grid-container">
-        <FilterBar
-          browseMode={browseMode} onBrowseModeChange={handleBrowseModeChange}
-          species={species} onSpeciesChange={handleSpeciesChange}
-          speciesList={speciesList}
-          individual={individual} onIndividualChange={handleIndividualChange}
-          individualList={individualList}
-          dateFrom={dateFrom} onDateFromChange={handleDateFromChange}
-          dateTo={dateTo} onDateToChange={handleDateToChange}
-        />
+      <FilterSidebar
+        browseMode={browseMode}
+        species={speciesList}
+        selectedSpecies={species}
+        individuals={individualList}
+        selectedIndividual={individual}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onChange={handleFilterChange}
+      />
 
+      <div className="detection-grid-container">
         {result === null ? (
           <div>Loading…</div>
         ) : (
           <>
             <div className="detection-grid">
               {result.detections.map(detection => (
-                <div
+                <DetectionCard
                   key={detection.id}
-                  className={`grid-cell${selectedId === detection.id ? ' grid-cell--selected' : ''}`}
+                  cropUrl={detection.crop_url}
+                  label={detection.label.split(';').pop()}
+                  confidence={detection.confidence}
+                  capturedAt={detection.captured_at}
+                  selected={selectedId === detection.id}
                   onClick={() => setSelectedId(detection.id)}
-                >
-                  <img
-                    src={detection.crop_url}
-                    alt={detection.label}
-                    title={`${detection.label} (${(detection.confidence * 100).toFixed(1)}%)`}
-                  />
-                  <div className="grid-cell-label">{detection.label}</div>
-                </div>
+                />
               ))}
             </div>
 
             <div className="pagination">
-              <button onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-                ← prev
-              </button>
+              <Button
+                label="← prev"
+                variant="ghost"
+                onClick={() => setPage(p => p - 1)}
+                disabled={page === 1}
+              />
               <span className="pagination-info">
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
-              <button
+              <Button
+                label="next →"
+                variant="ghost"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page === Math.ceil(result.total / result.page_size)}
-              >
-                next →
-              </button>
+              />
             </div>
           </>
         )}
       </div>
 
-      {selectedId !== null && (
+      {selectedDetection !== null && (
         <DetailPanel
-          detectionId={selectedId}
+          detection={selectedDetection}
           onClose={() => setSelectedId(null)}
         />
       )}

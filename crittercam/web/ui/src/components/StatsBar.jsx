@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import StatCard from './StatCard'
 
 // A component is just a function that returns JSX (HTML-like syntax).
 // React calls this function whenever it needs to render or re-render the component.
@@ -28,22 +29,13 @@ export default function StatsBar() {
     return <div className="stats-bar">Loading…</div>
   }
 
+  // StatsBar is a container component: it owns the fetch and passes values down.
+  // StatCard is a presentational component: it just renders what it receives.
   return (
     <div className="stats-bar">
-      <Stat number={stats.total_images} label="images" />
-      <Stat number={stats.total_detections} label="detections" />
-      <Stat number={stats.species_seen} label="species" />
-    </div>
-  )
-}
-
-// A small helper component. Components can be composed freely — StatsBar renders
-// three Stat components, passing data down via props (the function's argument object).
-function Stat({ number, label }) {
-  return (
-    <div className="stat">
-      <div className="stat-number">{number}</div>
-      <div className="stat-label">{label}</div>
+      <StatCard value={stats.total_images} label="images" />
+      <StatCard value={stats.total_detections} label="detections" />
+      <StatCard value={stats.species_seen} label="species" />
     </div>
   )
 }
