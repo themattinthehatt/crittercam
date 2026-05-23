@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import DetailPanel from './DetailPanel.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
+import Button from './Button.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
@@ -107,18 +108,21 @@ export default function DetectionGrid() {
             </div>
 
             <div className="pagination">
-              <button onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-                ← prev
-              </button>
+              <Button
+                label="← prev"
+                variant="ghost"
+                onClick={() => setPage(p => p - 1)}
+                disabled={page === 1}
+              />
               <span className="pagination-info">
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
-              <button
+              <Button
+                label="next →"
+                variant="ghost"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page === Math.ceil(result.total / result.page_size)}
-              >
-                next →
-              </button>
+              />
             </div>
           </>
         )}

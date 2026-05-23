@@ -79,19 +79,6 @@ header p {
   margin-top: 1.25rem;
 }
 
-.pagination button {
-  padding: 0.4rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-}
-
-.pagination button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
 
 .pagination-info {
   font-size: 0.9rem;
@@ -132,17 +119,7 @@ header p {
   font-size: 0.9rem;
 }
 
-/* filter bar */
-
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-end;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e0e0e0;
-}
+/* filter sidebar */
 
 .filter-field {
   display: flex;
@@ -165,13 +142,6 @@ header p {
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
-}
-
-.filter-divider {
-  width: 1px;
-  align-self: stretch;
-  background: #e0e0e0;
-  margin: 0.1rem 0;
 }
 
 .filter-clear {
