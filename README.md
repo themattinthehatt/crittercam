@@ -1,6 +1,14 @@
 ![](assets/crittercam_banner.png)
 
-Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.
+[//]: # (Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.)
+
+<h4 align="center">Backyard wildlife camera trap pipeline<br>for ingestion, species identification, individual re-identification, and local dashboard</h4>
+
+<div align="center">
+  <img src="assets/app_screenshot.png" width="90%" />
+</div>
+
+<br>
 
 This is a fun DIY project - for serious camera trap software with similar objectives, see [AddaxAI](https://addaxdatascience.com/addaxai/).
 
