@@ -2,11 +2,12 @@
 
 [//]: # (Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard.)
 
-<h3 align="center">Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard</h3>
+<h4 align="center">Backyard wildlife camera trap pipeline for ingestion, species identification, individual re-identification, and local dashboard</h4>
 
 <div align="center">
-  <img src="assets/app_screenshot.png" width="80%" />
+  <img src="assets/app_screenshot.png" width="90%" />
 </div>
+
 
 This is a fun DIY project - for serious camera trap software with similar objectives, see [AddaxAI](https://addaxdatascience.com/addaxai/).
 
