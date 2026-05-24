@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { toggleFavorite, toggleFavoriteInList } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 import Button from './Button.jsx'
+import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
@@ -57,6 +59,7 @@ export default function DetectionGrid() {
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
     if (browseMode === 'individual' && individual) params.append('individual_id', individual)
+    if (browseMode === 'favorited') params.append('only_favorites', 'true')
     if (dateFrom) params.append('date_from', dateFrom)
     if (dateTo) params.append('date_to', dateTo)
 
@@ -115,7 +118,7 @@ export default function DetectionGrid() {
   }
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-6 items-start relative">
       <FilterSidebar
         browseMode={browseMode}
         species={speciesList}
@@ -142,13 +145,18 @@ export default function DetectionGrid() {
                   capturedAt={detection.captured_at}
                   selected={selectedId === detection.id}
                   onClick={() => setSelectedId(detection.id)}
+                  isFavorite={detection.favorite === 1}
+                  onFavorite={() => toggleFavoriteInList(
+                    detection,
+                    updater => setResult(prev => ({ ...prev, detections: updater(prev.detections) })),
+                  )}
                 />
               ))}
             </div>
 
             <div className="flex items-center justify-center gap-4 mt-5">
               <Button
-                label="← prev"
+                label={<MoveLeftIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p - 1)}
                 disabled={page === 1}
@@ -157,7 +165,7 @@ export default function DetectionGrid() {
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
               <Button
-                label="next →"
+                label={<MoveRightIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page === Math.ceil(result.total / result.page_size)}
@@ -175,6 +183,17 @@ export default function DetectionGrid() {
           hasNext={hasNext}
           onPrev={handlePrev}
           onNext={handleNext}
+          isFavorite={selectedDetection.favorite === 1}
+          onFavorite={() => toggleFavorite(
+            selectedDetection,
+            setSelectedDetection,
+            newValue => setResult(prev => prev && ({
+              ...prev,
+              detections: prev.detections.map(d =>
+                d.id === selectedDetection.id ? { ...d, favorite: newValue } : d
+              ),
+            })),
+          )}
         />
       )}
     </div>

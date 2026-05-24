@@ -1,6 +1,7 @@
 """Detections API endpoints — filterable detection list and single-detection detail."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from crittercam.web.api import get_conn
 
@@ -67,6 +68,7 @@ def list_detections(
     individual_id: int | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    only_favorites: bool = False,
 ) -> dict:
     """Return a paginated, filterable list of active detections for the thumbnail grid.
 
@@ -76,6 +78,7 @@ def list_detections(
         species: leaf species name to filter by (e.g. 'vulpes vulpes'); omit for all
         date_from: ISO date string (YYYY-MM-DD) — include detections on or after this date
         date_to: ISO date string (YYYY-MM-DD) — include detections on or before this date
+        only_favorites: if True, restrict to detections whose media is marked favorite
 
     Returns:
         dict with 'detections' list, 'total' count, 'page', and 'page_size'
@@ -112,6 +115,9 @@ def list_detections(
         conditions.append("i.captured_at < date(:date_to, '+1 day')")
         params['date_to'] = date_to
 
+    if only_favorites:
+        conditions.append('i.favorite = 1')
+
     where = ' AND '.join(conditions)
 
     total = conn.execute(
@@ -126,7 +132,8 @@ def list_detections(
     rows = conn.execute(
         f'''
         SELECT d.id, d.label, d.confidence, d.crop_path,
-               d.individual_id, ind.nickname, i.captured_at
+               d.individual_id, ind.nickname, i.captured_at,
+               i.id AS media_id, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
@@ -149,6 +156,8 @@ def list_detections(
                 'individual_id': row['individual_id'],
                 'nickname': row['nickname'],
                 'captured_at': row['captured_at'],
+                'media_id': row['media_id'],
+                'favorite': row['favorite'],
             }
             for row in rows
         ],
@@ -174,7 +183,8 @@ def recent_by_species() -> list[dict]:
 
     rows = conn.execute(
         '''
-        SELECT d.id, d.label, d.confidence, d.crop_path, i.captured_at
+        SELECT d.id, d.label, d.confidence, d.crop_path,
+               i.captured_at, i.id AS media_id, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         INNER JOIN (
@@ -199,6 +209,8 @@ def recent_by_species() -> list[dict]:
             'confidence': round(row['confidence'], 3),
             'crop_url': f'/media/{row["crop_path"]}',
             'captured_at': row['captured_at'],
+            'media_id': row['media_id'],
+            'favorite': row['favorite'],
         }
         for row in rows
     ]
@@ -227,7 +239,8 @@ def get_detection(detection_id: int) -> dict:
         SELECT d.id, d.label, d.confidence, d.crop_path,
                d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
                d.individual_id, ind.nickname,
-               i.path AS image_path, i.captured_at, i.temperature_c
+               i.id AS media_id, i.path AS image_path,
+               i.captured_at, i.temperature_c, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
@@ -289,6 +302,45 @@ def get_detection(detection_id: int) -> dict:
         'temperature_c': row['temperature_c'],
         'individual_id': row['individual_id'],
         'nickname': row['nickname'],
+        'media_id': row['media_id'],
+        'favorite': row['favorite'],
         'prev_id': prev_row['id'] if prev_row else None,
         'next_id': next_row['id'] if next_row else None,
     }
+
+
+class FavoritePayload(BaseModel):
+    """Request body for the set_favorite endpoint."""
+
+    favorite: int
+
+
+@router.patch('/api/media/{media_id}/favorite')
+def set_favorite(media_id: int, payload: FavoritePayload) -> dict:
+    """Set or clear the favorite flag on a media item.
+
+    Args:
+        media_id: primary key of the media row
+        payload: dict with 'favorite' key (0 or 1)
+
+    Returns:
+        dict with media_id and updated favorite value
+
+    Raises:
+        HTTPException: 404 if the media item does not exist
+    """
+    conn = get_conn()
+
+    row = conn.execute('SELECT id FROM media WHERE id = :id', {'id': media_id}).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f'media {media_id} not found')
+
+    conn.execute(
+        'UPDATE media SET favorite = :favorite WHERE id = :id',
+        {'favorite': payload.favorite, 'id': media_id},
+    )
+    conn.commit()
+    conn.close()
+
+    return {'media_id': media_id, 'favorite': payload.favorite}

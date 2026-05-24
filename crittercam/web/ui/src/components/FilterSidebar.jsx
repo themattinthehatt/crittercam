@@ -1,3 +1,5 @@
+import Button from './Button.jsx'
+
 // FilterSidebar uses controlled inputs throughout — every input has a value=
 // prop (what React renders) and an onChange= prop (how React hears changes).
 // This makes React state the single source of truth: the parent always knows
@@ -45,10 +47,11 @@ export default function FilterSidebar({
         >
           <option value="species">species</option>
           <option value="individual">individual</option>
+          <option value="favorited">favorited</option>
         </select>
       </label>
 
-      {browseMode === 'species' ? (
+      {browseMode !== 'favorited' && (browseMode === 'species' ? (
         <label className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-wide text-base-content/50">species</span>
           <select
@@ -78,7 +81,7 @@ export default function FilterSidebar({
             ))}
           </select>
         </label>
-      )}
+      ))}
 
       <label className="flex flex-col gap-1">
         <span className="text-xs uppercase tracking-wide text-base-content/50">from</span>
@@ -101,9 +104,7 @@ export default function FilterSidebar({
       </label>
 
       {hasFilters && (
-        <button className="btn btn-sm btn-ghost self-start" onClick={handleClear}>
-          clear filters
-        </button>
+        <Button label="clear filters" variant="ghost" size="sm" onClick={handleClear} />
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toggleFavorite, toggleFavoriteInList } from '../api.js'
 import DetectionCard from './DetectionCard'
 import DetectionModal from './DetectionModal'
 
@@ -46,6 +47,8 @@ export default function RecentBySpecies() {
             capturedAt={det.captured_at}
             selected={selectedId === det.id}
             onClick={() => setSelectedId(det.id)}
+            isFavorite={det.favorite === 1}
+            onFavorite={() => toggleFavoriteInList(det, setDetections)}
           />
         ))}
       </div>
@@ -58,6 +61,14 @@ export default function RecentBySpecies() {
           hasNext={hasNext}
           onPrev={handlePrev}
           onNext={handleNext}
+          isFavorite={selectedDetection.favorite === 1}
+          onFavorite={() => toggleFavorite(
+            selectedDetection,
+            setSelectedDetection,
+            newValue => setDetections(prev => prev.map(d =>
+              d.id === selectedDetection.id ? { ...d, favorite: newValue } : d
+            )),
+          )}
         />
       )}
     </div>

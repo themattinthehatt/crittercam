@@ -1,8 +1,10 @@
+import { StarIcon, TrashIcon } from './icons.jsx'
+
 // DetectionModal is a presentational component — it receives a fully-loaded
 // detection object and renders it. The parent (DetectionGrid) owns the fetch.
 // hasPrev/hasNext control whether nav arrows are rendered; onPrev/onNext are
 // called when the user clicks them.
-export default function DetectionModal({ detection, onClose, hasPrev = false, hasNext = false, onPrev, onNext }) {
+export default function DetectionModal({ detection, onClose, hasPrev = false, hasNext = false, onPrev, onNext, isFavorite = false, onFavorite, onDelete }) {
   // label is stored as a semicolon-joined taxonomy path like
   // "animalia;chordata;mammalia;...;vulpes vulpes"; take only the last part.
   const label = detection.label.split(';').pop()
@@ -50,7 +52,26 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
         {/* right column (~25%) — full frame + metadata, scrollable */}
         <div className="flex-1 flex flex-col border-l border-base-300 overflow-y-auto">
 
-          <div className="flex justify-end p-3">
+          {/* top bar: action buttons left, close button right */}
+          <div className="flex items-center justify-between p-3">
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-sm btn-ghost text-error"
+                onClick={onDelete}
+                title="Delete"
+              >
+                <TrashIcon className="size-5" />
+              </button>
+              <button
+                className={`btn btn-sm btn-ghost ${isFavorite ? 'text-yellow-400' : 'text-base-content/40'}`}
+                onClick={onFavorite}
+                title={isFavorite ? 'Unfavorite' : 'Favorite'}
+              >
+                {/* CSS fill-current overrides the SVG fill="none" attribute,
+                    giving a solid star when favorited */}
+                <StarIcon className={`size-5 ${isFavorite ? 'fill-current' : ''}`} />
+              </button>
+            </div>
             <button className="btn btn-xs btn-ghost" onClick={onClose}>✕</button>
           </div>
 
