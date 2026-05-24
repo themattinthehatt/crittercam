@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection, patchFavorite } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
+import BatchActionBar from './BatchActionBar.jsx'
+import BatchEditPanel from './BatchEditPanel.jsx'
 import Button from './Button.jsx'
 import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
 
@@ -22,6 +24,14 @@ export default function DetectionGrid() {
   // incrementing refreshKey re-triggers the fetch effect without changing
   // any filter, used to repopulate the grid after a deletion.
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // batch selection — a Set of detection ids the user has checked.
+  // batchMode is true whenever the set is non-empty; in that mode card clicks
+  // toggle batch membership instead of opening the detail modal.
+  const [batchSelectedIds, setBatchSelectedIds] = useState(new Set())
+  const batchMode = batchSelectedIds.size > 0
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
+  const [showBatchEdit, setShowBatchEdit] = useState(false)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -53,12 +63,20 @@ export default function DetectionGrid() {
       .then(data => setSelectedDetection(data))
   }, [selectedId])
 
+  // entering batch mode closes the detail modal — having both open is confusing.
+  useEffect(() => {
+    if (batchMode) setSelectedId(null)
+  }, [batchMode])
+
   // re-fetch whenever page or any filter changes.
   // URLSearchParams builds the query string cleanly: it only adds a key
   // when we append it, so omitted filters don't appear in the URL at all.
   useEffect(() => {
     setResult(null)
     setSelectedId(null)
+    setBatchSelectedIds(new Set())
+    setShowBatchDeleteConfirm(false)
+    setShowBatchEdit(false)
 
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
@@ -133,6 +151,74 @@ export default function DetectionGrid() {
     })
   }
 
+  const handleBatchDelete = async () => {
+    // deduplicate media_ids — multiple detections can share one media item
+    const mediaIds = [...new Set(
+      [...batchSelectedIds]
+        .map(id => result.detections.find(d => d.id === id)?.media_id)
+        .filter(Boolean)
+    )]
+    for (const mid of mediaIds) {
+      await deleteMedia(mid)
+    }
+    setBatchSelectedIds(new Set())
+    setShowBatchDeleteConfirm(false)
+    setRefreshKey(k => k + 1)
+  }
+
+  const handleBatchSave = async (speciesLeaf, editIndividual) => {
+    const detections = [...batchSelectedIds]
+      .map(id => result.detections.find(d => d.id === id))
+      .filter(Boolean)
+    for (const det of detections) {
+      // '' means no change — keep each detection's current species
+      const leaf = speciesLeaf !== '' ? speciesLeaf : det.label.split(';').pop()
+      // 'no-change' means keep each detection's current individual
+      const indId = editIndividual === 'no-change'
+        ? det.individual_id
+        : editIndividual === 'none'
+          ? null
+          : parseInt(editIndividual, 10)
+      await patchDetection(det.id, leaf, indId)
+    }
+    setBatchSelectedIds(new Set())
+    setShowBatchEdit(false)
+    setRefreshKey(k => k + 1)
+  }
+
+  const handleBatchFavorite = () => {
+    const newValue = allFavorited ? 0 : 1
+    // optimistic update — cards reflect the change immediately
+    setResult(prev => prev && ({
+      ...prev,
+      detections: prev.detections.map(d =>
+        batchSelectedIds.has(d.id) ? { ...d, favorite: newValue } : d
+      ),
+    }))
+    // deduplicate media_ids — multiple detections can share one media item
+    const mediaIds = [...new Set(
+      [...batchSelectedIds]
+        .map(id => result.detections.find(d => d.id === id)?.media_id)
+        .filter(Boolean)
+    )]
+    for (const mid of mediaIds) patchFavorite(mid, newValue)
+  }
+
+  const toggleBatch = id => {
+    setBatchSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // star is solid when every selected detection is already favorited.
+  const allFavorited = batchMode && result !== null &&
+    [...batchSelectedIds].every(id =>
+      result.detections.find(d => d.id === id)?.favorite === 1
+    )
+
   const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
     setBrowseMode(bm)
     setSpecies(sp)
@@ -160,6 +246,28 @@ export default function DetectionGrid() {
           <div>Loading…</div>
         ) : (
           <>
+            {batchMode && !showBatchEdit && (
+              <BatchActionBar
+                count={batchSelectedIds.size}
+                allFavorited={allFavorited}
+                onClear={() => { setBatchSelectedIds(new Set()); setShowBatchDeleteConfirm(false) }}
+                onDelete={() => setShowBatchDeleteConfirm(true)}
+                onFavorite={handleBatchFavorite}
+                onEdit={() => setShowBatchEdit(true)}
+                showDeleteConfirm={showBatchDeleteConfirm}
+                onDeleteConfirm={handleBatchDelete}
+                onDeleteCancel={() => setShowBatchDeleteConfirm(false)}
+              />
+            )}
+            {showBatchEdit && (
+              <BatchEditPanel
+                count={batchSelectedIds.size}
+                speciesList={speciesList}
+                individualList={individualList}
+                onSave={handleBatchSave}
+                onCancel={() => setShowBatchEdit(false)}
+              />
+            )}
             <div className="grid grid-cols-4 gap-3">
               {result.detections.map(detection => (
                 <DetectionCard
@@ -168,13 +276,18 @@ export default function DetectionGrid() {
                   label={detection.label.split(';').pop()}
                   confidence={detection.confidence}
                   capturedAt={detection.captured_at}
-                  selected={selectedId === detection.id}
-                  onClick={() => setSelectedId(detection.id)}
+                  selected={!batchMode && selectedId === detection.id}
+                  onClick={batchMode
+                    ? () => toggleBatch(detection.id)
+                    : () => setSelectedId(detection.id)
+                  }
                   isFavorite={detection.favorite === 1}
                   onFavorite={() => toggleFavoriteInList(
                     detection,
                     updater => setResult(prev => ({ ...prev, detections: updater(prev.detections) })),
                   )}
+                  batchSelected={batchSelectedIds.has(detection.id)}
+                  onBatchSelect={() => toggleBatch(detection.id)}
                 />
               ))}
             </div>

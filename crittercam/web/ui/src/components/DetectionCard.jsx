@@ -14,25 +14,41 @@ function formatTimestamp(iso) {
 // DetectionCard is a presentational component — it receives already-parsed data
 // and renders it. label should be the leaf of the taxonomy string (e.g.
 // 'white-tailed deer'), not the full semicolon-delimited path.
-export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick, selected = false, isFavorite = false, onFavorite }) {
+export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick, selected = false, isFavorite = false, onFavorite, batchSelected = false, onBatchSelect }) {
   const isBlank = label === 'blank'
   const timestamp = formatTimestamp(capturedAt)
+
+  // ring-primary marks batch selection; ring-base-content/50 marks modal selection.
+  // batch ring takes priority when both could theoretically apply.
+  const ringClass = batchSelected
+    ? 'ring-2 ring-primary'
+    : selected ? 'ring-2 ring-base-content/50' : ''
 
   return (
     // bg-base-200 makes the card slightly darker than the page background.
     // overflow-hidden clips the image to the card's rounded corners.
     // onClick is passed straight through so the whole card is clickable.
     <div
-      className={`bg-base-200 rounded overflow-hidden cursor-pointer ${selected ? 'ring-2 ring-base-content/50' : ''}`}
+      className={`bg-base-200 rounded overflow-hidden cursor-pointer ${ringClass}`}
       onClick={onClick}
     >
       {/* pt-1 exposes a thin sliver of the card background above the image,
-          visually anchoring the image inside the card. */}
-      <div className="pt-1 px-1">
+          visually anchoring the image inside the card. relative allows the
+          batch checkbox to be positioned over the image corner. */}
+      <div className="pt-1 px-1 relative">
         {cropUrl
           ? <img className="w-full aspect-[3/2] object-contain block bg-base-300 hover:opacity-90 transition-opacity duration-100" src={cropUrl} alt={label} />
           : <div className="w-full aspect-[3/2] bg-base-300" />
         }
+        {/* batch selection checkbox — always visible so the user knows cards are
+            selectable; stopPropagation prevents the card's onClick from also firing. */}
+        <input
+          type="checkbox"
+          className="checkbox checkbox-xs absolute top-1.5 right-1.5 bg-white border-white/70"
+          checked={batchSelected}
+          onChange={() => {}}
+          onClick={e => { e.stopPropagation(); onBatchSelect?.() }}
+        />
       </div>
 
       {/* info section: badges on one row, date on the next */}
