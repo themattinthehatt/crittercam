@@ -61,6 +61,23 @@ def _insert_detection(
     db.commit()
 
 
+def _insert_individual(db, ind_id: int, species_leaf: str = 'vulpes vulpes', nickname: str | None = None) -> None:
+    db.execute(
+        '''
+        INSERT INTO individuals (id, species_leaf, nickname, created_at, updated_at)
+        VALUES (:id, :species_leaf, :nickname, :created_at, :updated_at)
+        ''',
+        {
+            'id': ind_id,
+            'species_leaf': species_leaf,
+            'nickname': nickname,
+            'created_at': '2026-01-01T00:00:00',
+            'updated_at': '2026-01-01T00:00:00',
+        },
+    )
+    db.commit()
+
+
 # ---------------------------------------------------------------------------
 # GET /api/detections
 # ---------------------------------------------------------------------------
@@ -242,6 +259,76 @@ class TestPatchDetection:
         full_label = response.json()['label']
         assert ';' in full_label
         assert full_label.endswith('vulpes vulpes')
+
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/media/{media_id}
+# ---------------------------------------------------------------------------
+
+class TestDeleteMedia:
+    """Test the delete_media endpoint."""
+
+    def test_delete_removes_media_and_detections(self, client, db):
+        _insert_media(db)
+        _insert_detection(db, det_id=1)
+
+        response = client.delete('/api/media/1')
+
+        assert response.status_code == 200
+        assert response.json() == {'deleted': 1}
+        assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM detections').fetchone()[0] == 0
+
+    def test_delete_missing_media_returns_404(self, client, db):
+        response = client.delete('/api/media/999')
+        assert response.status_code == 404
+
+    def test_delete_orphans_individual_when_last_detection_removed(self, client, db):
+        """Deleting the only media linked to an individual must remove that individual."""
+        _insert_media(db)
+        _insert_individual(db, ind_id=1)
+        _insert_detection(db, det_id=1, individual_id=1)
+
+        client.delete('/api/media/1')
+
+        assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 1').fetchone()[0] == 0
+
+    def test_delete_preserves_individual_when_other_detections_remain(self, client, db):
+        """Individual must survive if it still has detections on other media."""
+        _insert_media(db, media_id=1)
+        _insert_media(db, media_id=2)
+        _insert_individual(db, ind_id=1)
+        _insert_detection(db, det_id=1, media_id=1, individual_id=1)
+        _insert_detection(db, det_id=2, media_id=2, individual_id=1,
+                          crop_path='derived/2026/01/01/det0002.jpg')
+
+        client.delete('/api/media/1')
+
+        assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 1').fetchone()[0] == 1
+
+    def test_delete_removes_only_orphaned_individuals(self, client, db):
+        """Only the individual whose last detection was removed is deleted."""
+        _insert_media(db, media_id=1)
+        _insert_media(db, media_id=2)
+        _insert_individual(db, ind_id=1)
+        _insert_individual(db, ind_id=2)
+        # individual 1 has one detection on media 1 (being deleted)
+        _insert_detection(db, det_id=1, media_id=1, individual_id=1)
+        # individual 2 has detections on both media items
+        _insert_detection(db, det_id=2, media_id=1, individual_id=2,
+                          crop_path='derived/2026/01/01/det0002.jpg')
+        _insert_detection(db, det_id=3, media_id=2, individual_id=2,
+                          crop_path='derived/2026/01/01/det0003.jpg')
+
+        client.delete('/api/media/1')
+
+        assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 1').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 2').fetchone()[0] == 1
+
+
+class TestPatchDetectionFilterBehavior:
+    """Tests for filter-aware behavior after patching a detection."""
 
     def test_patch_removes_detection_from_previous_species_filter(self, client, db):
         """After patching species, the detection must not appear under the old species filter.

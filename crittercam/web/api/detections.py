@@ -410,6 +410,15 @@ def delete_media(media_id: int) -> dict:
         conn.close()
         raise HTTPException(status_code=404, detail=f'media {media_id} not found')
 
+    # record which individuals are referenced before deletion so we can check
+    # for orphans afterward.
+    individual_ids = [
+        r['individual_id'] for r in conn.execute(
+            'SELECT DISTINCT individual_id FROM detections WHERE media_id = :id AND individual_id IS NOT NULL',
+            {'id': media_id},
+        ).fetchall()
+    ]
+
     # processing_jobs can reference either media (media_id) or detections
     # (detection_id); both must be cleared before their referents can be deleted.
     det_ids = [
@@ -421,6 +430,16 @@ def delete_media(media_id: int) -> dict:
     conn.execute('DELETE FROM processing_jobs WHERE media_id = :id', {'id': media_id})
     conn.execute('DELETE FROM detections WHERE media_id = :id', {'id': media_id})
     conn.execute('DELETE FROM media WHERE id = :id', {'id': media_id})
+
+    # remove individuals whose last detection was just deleted
+    for ind_id in individual_ids:
+        remaining = conn.execute(
+            'SELECT COUNT(*) FROM detections WHERE individual_id = :id',
+            {'id': ind_id},
+        ).fetchone()[0]
+        if remaining == 0:
+            conn.execute('DELETE FROM individuals WHERE id = :id', {'id': ind_id})
+
     conn.commit()
     conn.close()
 
