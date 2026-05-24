@@ -17,6 +17,10 @@ ALTER TABLE detections ADD COLUMN reid_model_name        TEXT;
 ALTER TABLE detections ADD COLUMN reid_model_version     TEXT;
 ALTER TABLE detections ADD COLUMN individual_id          INTEGER REFERENCES individuals(id);
 ALTER TABLE detections ADD COLUMN individual_similarity  REAL;
+-- individual_assigned_by mirrors the label_assigned_by convention:
+-- 'algorithm' means the re-ID model set it; 'human' means a human confirmed
+-- or corrected it. The re-ID pipeline must skip rows where
+-- individual_assigned_by = 'human'.
 ALTER TABLE detections ADD COLUMN individual_assigned_by TEXT;
 ALTER TABLE detections ADD COLUMN individual_assigned_at TEXT;
 

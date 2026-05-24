@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList, deleteMedia } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
@@ -121,6 +121,18 @@ export default function DetectionGrid() {
     })
   }
 
+  const handleSave = (speciesLeaf, individualId) => {
+    patchDetection(selectedDetection.id, speciesLeaf, individualId).then(updated => {
+      setSelectedDetection(updated)
+      setResult(prev => prev && ({
+        ...prev,
+        detections: prev.detections.map(d =>
+          d.id === updated.id ? { ...d, label: updated.label, confidence: updated.confidence } : d
+        ),
+      }))
+    })
+  }
+
   const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
     setBrowseMode(bm)
     setSpecies(sp)
@@ -198,6 +210,9 @@ export default function DetectionGrid() {
           onNext={handleNext}
           isFavorite={selectedDetection.favorite === 1}
           onDelete={handleDelete}
+          onSave={handleSave}
+          speciesList={speciesList}
+          individualList={individualList}
           onFavorite={() => toggleFavorite(
             selectedDetection,
             setSelectedDetection,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList, deleteMedia } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection } from '../api.js'
 import DetectionCard from './DetectionCard'
 import DetectionModal from './DetectionModal'
 
@@ -8,6 +8,17 @@ export default function RecentBySpecies() {
   const [selectedId, setSelectedId] = useState(null)
   const [selectedDetection, setSelectedDetection] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [speciesList, setSpeciesList] = useState([])
+  const [individualList, setIndividualList] = useState([])
+
+  useEffect(() => {
+    fetch('/api/species')
+      .then(r => r.json())
+      .then(data => setSpeciesList(data))
+    fetch('/api/individuals')
+      .then(r => r.json())
+      .then(data => setIndividualList(data))
+  }, [])
 
   useEffect(() => {
     setDetections(null)
@@ -29,6 +40,17 @@ export default function RecentBySpecies() {
         setSelectedId(null)
         setRefreshKey(k => k + 1)
       }
+    })
+  }
+
+  const handleSave = (speciesLeaf, individualId) => {
+    patchDetection(selectedDetection.id, speciesLeaf, individualId).then(updated => {
+      setSelectedDetection(updated)
+      // recent_by_species stores leaf names; get_detection returns the full
+      // taxonomy string, so split before writing back into the list.
+      setDetections(prev => prev && prev.map(d =>
+        d.id === updated.id ? { ...d, label: updated.label.split(';').pop(), confidence: updated.confidence } : d
+      ))
     })
   }
 
@@ -73,6 +95,9 @@ export default function RecentBySpecies() {
           onPrev={handlePrev}
           onNext={handleNext}
           onDelete={handleDelete}
+          onSave={handleSave}
+          speciesList={speciesList}
+          individualList={individualList}
           isFavorite={selectedDetection.favorite === 1}
           onFavorite={() => toggleFavorite(
             selectedDetection,
