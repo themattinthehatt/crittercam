@@ -5,7 +5,9 @@ export default {
   component: FilterSidebar,
   decorators: [
     Story => (
-      <div style={{ width: '220px' }}>
+      // FilterSidebar is absolutely positioned to the left of its relative
+      // parent, so the parent needs left margin to bring the sidebar on-screen.
+      <div style={{ position: 'relative', marginLeft: '200px', height: '300px' }}>
         <Story />
       </div>
     ),
