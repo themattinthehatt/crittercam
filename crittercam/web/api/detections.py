@@ -309,6 +309,46 @@ def get_detection(detection_id: int) -> dict:
     }
 
 
+@router.delete('/api/media/{media_id}')
+def delete_media(media_id: int) -> dict:
+    """Delete a media item and all its associated detections and processing jobs.
+
+    Detections and processing jobs are deleted first to satisfy foreign key
+    constraints before the media row itself is removed.
+
+    Args:
+        media_id: primary key of the media row
+
+    Returns:
+        dict with deleted media_id
+
+    Raises:
+        HTTPException: 404 if the media item does not exist
+    """
+    conn = get_conn()
+
+    row = conn.execute('SELECT id FROM media WHERE id = :id', {'id': media_id}).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f'media {media_id} not found')
+
+    # processing_jobs can reference either media (media_id) or detections
+    # (detection_id); both must be cleared before their referents can be deleted.
+    det_ids = [
+        r['id'] for r in
+        conn.execute('SELECT id FROM detections WHERE media_id = :id', {'id': media_id}).fetchall()
+    ]
+    for det_id in det_ids:
+        conn.execute('DELETE FROM processing_jobs WHERE detection_id = :id', {'id': det_id})
+    conn.execute('DELETE FROM processing_jobs WHERE media_id = :id', {'id': media_id})
+    conn.execute('DELETE FROM detections WHERE media_id = :id', {'id': media_id})
+    conn.execute('DELETE FROM media WHERE id = :id', {'id': media_id})
+    conn.commit()
+    conn.close()
+
+    return {'deleted': media_id}
+
+
 class FavoritePayload(BaseModel):
     """Request body for the set_favorite endpoint."""
 

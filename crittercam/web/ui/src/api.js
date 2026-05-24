@@ -13,6 +13,16 @@ export function patchFavorite(mediaId, newValue) {
 }
 
 /**
+ * Delete a media item and all its associated detections.
+ *
+ * @param {number} mediaId
+ * @returns {Promise} resolves when the server confirms deletion
+ */
+export function deleteMedia(mediaId) {
+  return fetch(`/api/media/${mediaId}`, { method: 'DELETE' })
+}
+
+/**
  * Toggle the favorite flag on the currently open detection (modal context).
  *
  * Updates selectedDetection state optimistically. The optional onUpdate

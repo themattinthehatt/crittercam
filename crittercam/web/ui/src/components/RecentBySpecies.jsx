@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia } from '../api.js'
 import DetectionCard from './DetectionCard'
 import DetectionModal from './DetectionModal'
 
@@ -7,12 +7,14 @@ export default function RecentBySpecies() {
   const [detections, setDetections] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [selectedDetection, setSelectedDetection] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
+    setDetections(null)
     fetch('/api/detections/recent_by_species')
       .then(r => r.json())
       .then(data => setDetections(data))
-  }, [])
+  }, [refreshKey])
 
   useEffect(() => {
     if (selectedId === null) { setSelectedDetection(null); return }
@@ -20,6 +22,15 @@ export default function RecentBySpecies() {
       .then(r => r.json())
       .then(data => setSelectedDetection(data))
   }, [selectedId])
+
+  const handleDelete = () => {
+    deleteMedia(selectedDetection.media_id).then(response => {
+      if (response.ok) {
+        setSelectedId(null)
+        setRefreshKey(k => k + 1)
+      }
+    })
+  }
 
   const idx = detections ? detections.findIndex(d => d.id === selectedId) : -1
   const hasPrev = idx > 0
@@ -61,6 +72,7 @@ export default function RecentBySpecies() {
           hasNext={hasNext}
           onPrev={handlePrev}
           onNext={handleNext}
+          onDelete={handleDelete}
           isFavorite={selectedDetection.favorite === 1}
           onFavorite={() => toggleFavorite(
             selectedDetection,

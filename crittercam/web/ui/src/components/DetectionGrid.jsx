@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
@@ -18,6 +18,10 @@ export default function DetectionGrid() {
   // when navigating across a page boundary, records which end of the
   // incoming page to auto-select once the fetch completes ('first' | 'last').
   const [pendingSelect, setPendingSelect] = useState(null)
+
+  // incrementing refreshKey re-triggers the fetch effect without changing
+  // any filter, used to repopulate the grid after a deletion.
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -66,7 +70,7 @@ export default function DetectionGrid() {
     fetch(`/api/detections?${params}`)
       .then(r => r.json())
       .then(data => setResult(data))
-  }, [page, browseMode, species, individual, dateFrom, dateTo])
+  }, [page, browseMode, species, individual, dateFrom, dateTo, refreshKey])
 
   // after a cross-page navigation, auto-select the first or last detection
   // once the new page's result arrives.
@@ -108,6 +112,15 @@ export default function DetectionGrid() {
   // wrapping each setter ensures the page reset and filter change happen together.
   // FilterSidebar fires onChange with the full state object — unpack it here
   // and reset to page 1 on any filter change.
+  const handleDelete = () => {
+    deleteMedia(selectedDetection.media_id).then(response => {
+      if (response.ok) {
+        setSelectedId(null)
+        setRefreshKey(k => k + 1)
+      }
+    })
+  }
+
   const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
     setBrowseMode(bm)
     setSpecies(sp)
@@ -184,6 +197,7 @@ export default function DetectionGrid() {
           onPrev={handlePrev}
           onNext={handleNext}
           isFavorite={selectedDetection.favorite === 1}
+          onDelete={handleDelete}
           onFavorite={() => toggleFavorite(
             selectedDetection,
             setSelectedDetection,
