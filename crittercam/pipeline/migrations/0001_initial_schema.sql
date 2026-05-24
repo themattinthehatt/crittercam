@@ -22,7 +22,8 @@ CREATE TABLE media (
     file_hash     TEXT    NOT NULL UNIQUE,
     file_size     INTEGER NOT NULL,
     temperature_c REAL,
-    thumb_path    TEXT
+    thumb_path    TEXT,
+    favorite      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE detections (
