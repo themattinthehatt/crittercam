@@ -1,8 +1,8 @@
-import DetailPanel from './DetailPanel'
+import DetectionModal from './DetectionModal'
 
 export default {
-  title: 'Domain/DetailPanel',
-  component: DetailPanel,
+  title: 'Domain/DetectionModal',
+  component: DetectionModal,
   decorators: [
     Story => (
       <div style={{ width: '300px' }}>

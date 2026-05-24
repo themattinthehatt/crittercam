@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import DetailPanel from './DetailPanel.jsx'
+import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 import Button from './Button.jsx'
@@ -9,7 +9,7 @@ export default function DetectionGrid() {
   const [result, setResult] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   // selectedDetection holds the full object for whichever grid cell is open.
-  // DetailPanel is now presentational — it receives this object directly
+  // DetectionModal is presentational — it receives this object directly
   // rather than fetching by ID itself.
   const [selectedDetection, setSelectedDetection] = useState(null)
 
@@ -76,7 +76,7 @@ export default function DetectionGrid() {
   }
 
   return (
-    <div className="flex gap-6 items-start relative">
+    <div className="flex gap-6 items-start">
       <FilterSidebar
         browseMode={browseMode}
         species={speciesList}
@@ -129,7 +129,7 @@ export default function DetectionGrid() {
       </div>
 
       {selectedDetection !== null && (
-        <DetailPanel
+        <DetectionModal
           detection={selectedDetection}
           onClose={() => setSelectedId(null)}
         />
