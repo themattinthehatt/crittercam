@@ -36,6 +36,10 @@ CREATE TABLE detections (
     bbox_h            REAL,
     label             TEXT    NOT NULL,
     confidence        REAL    NOT NULL,
+    -- label_assigned_by tracks the provenance of the current label.
+    -- 'algorithm' means the AI classifier set it and it may be overwritten on
+    -- re-classification. Any other value (e.g. 'human') means a human reviewed
+    -- it; the classifier must skip rows where label_assigned_by != 'algorithm'.
     label_assigned_at TEXT,
     label_assigned_by TEXT    NOT NULL DEFAULT 'algorithm',
     model_name        TEXT    NOT NULL,

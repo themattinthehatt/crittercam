@@ -195,7 +195,11 @@ export default function DetectionModal({
             </div>
             <div className="flex gap-2">
               <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0 pt-0.5">confidence</span>
-              <span>{(detection.confidence * 100).toFixed(1)}%</span>
+              <span>{detection.confidence != null ? `${(detection.confidence * 100).toFixed(1)}%` : '—'}</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0 pt-0.5">annotator</span>
+              <span>{detection.label_assigned_by}</span>
             </div>
             {detection.captured_at && (
               <div className="flex gap-2">

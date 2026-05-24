@@ -30,6 +30,7 @@ const BASE = {
   id: 1,
   label: 'abc123;animalia;chordata;mammalia;carnivora;canidae;vulpes;vulpes vulpes',
   confidence: 0.91,
+  label_assigned_by: 'algorithm',
   crop_url: 'https://placehold.co/300x200',
   image_url: 'https://placehold.co/800x600',
   captured_at: '2026-03-14T02:17:00',
@@ -247,6 +248,16 @@ export const EditModeWithIndividual = {
     await userEvent.click(canvas.getByTitle('Edit'))
     const selects = canvas.getAllByRole('combobox')
     await expect(selects[1]).toHaveValue('3')
+  },
+}
+
+// human-corrected detection — confidence shows '—', annotator shows 'human'
+export const HumanAnnotated = {
+  args: {
+    detection: { ...BASE, confidence: null, label_assigned_by: 'human' },
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
   },
 }
 

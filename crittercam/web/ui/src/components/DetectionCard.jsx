@@ -39,7 +39,7 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
       <div className="px-2 pt-1.5 pb-2">
         <div className="flex items-center justify-between gap-1">
           <Badge label={label} variant={isBlank ? 'blank' : 'species'} />
-          {!isBlank && (
+          {!isBlank && confidence != null && (
             <Badge
               label={`${Math.round(confidence * 100)}%`}
               variant="confidence"

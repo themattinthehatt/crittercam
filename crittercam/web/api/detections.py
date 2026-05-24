@@ -1,5 +1,6 @@
 """Detections API endpoints — filterable detection list and single-detection detail."""
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -239,6 +240,7 @@ def get_detection(detection_id: int) -> dict:
         SELECT d.id, d.label, d.confidence, d.crop_path,
                d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
                d.individual_id, ind.nickname,
+               d.label_assigned_by,
                i.id AS media_id, i.path AS image_path,
                i.captured_at, i.temperature_c, i.favorite
         FROM detections d
@@ -294,7 +296,8 @@ def get_detection(detection_id: int) -> dict:
     return {
         'id': row['id'],
         'label': row['label'],
-        'confidence': round(row['confidence'], 3),
+        'confidence': round(row['confidence'], 3) if row['confidence'] is not None else None,
+        'label_assigned_by': row['label_assigned_by'],
         'crop_url': f'/media/{row["crop_path"]}',
         'image_url': f'/media/{row["image_path"]}',
         'bbox': bbox,
@@ -362,9 +365,20 @@ def patch_detection(detection_id: int, payload: DetectionPatch) -> dict:
         conn.close()
         raise HTTPException(status_code=422, detail=f'unknown species: {payload.species_leaf}')
 
+    now = datetime.now(timezone.utc).isoformat()
     conn.execute(
-        'UPDATE detections SET label = :label, individual_id = :individual_id WHERE id = :id',
-        {'label': label_row['label'], 'individual_id': payload.individual_id, 'id': detection_id},
+        '''
+        UPDATE detections
+        SET label                  = :label,
+            confidence             = NULL,
+            label_assigned_by      = 'human',
+            label_assigned_at      = :now,
+            individual_id          = :individual_id,
+            individual_assigned_by = 'human',
+            individual_assigned_at = :now
+        WHERE id = :id
+        ''',
+        {'label': label_row['label'], 'now': now, 'individual_id': payload.individual_id, 'id': detection_id},
     )
     conn.commit()
     conn.close()
