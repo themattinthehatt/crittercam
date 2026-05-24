@@ -23,6 +23,25 @@ export function deleteMedia(mediaId) {
 }
 
 /**
+ * Update the species label and individual assignment on a detection.
+ *
+ * The backend resolves the full taxonomy label from the leaf name, so the
+ * caller never needs to know the full semicolon-delimited string.
+ *
+ * @param {number} detectionId
+ * @param {string} speciesLeaf - leaf species name (e.g. 'vulpes vulpes')
+ * @param {number|null} individualId - individual to assign, or null to clear
+ * @returns {Promise<object>} resolves with the updated detection object
+ */
+export function patchDetection(detectionId, speciesLeaf, individualId) {
+  return fetch(`/api/detections/${detectionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ species_leaf: speciesLeaf, individual_id: individualId }),
+  }).then(r => r.json())
+}
+
+/**
  * Toggle the favorite flag on the currently open detection (modal context).
  *
  * Updates selectedDetection state optimistically. The optional onUpdate
