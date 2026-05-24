@@ -49,7 +49,7 @@ export default function RecentBySpecies() {
       // recent_by_species stores leaf names; get_detection returns the full
       // taxonomy string, so split before writing back into the list.
       setDetections(prev => prev && prev.map(d =>
-        d.id === updated.id ? { ...d, label: updated.label.split(';').pop() } : d
+        d.id === updated.id ? { ...d, label: updated.label.split(';').pop(), confidence: updated.confidence } : d
       ))
     })
   }

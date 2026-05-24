@@ -127,7 +127,7 @@ export default function DetectionGrid() {
       setResult(prev => prev && ({
         ...prev,
         detections: prev.detections.map(d =>
-          d.id === updated.id ? { ...d, label: updated.label } : d
+          d.id === updated.id ? { ...d, label: updated.label, confidence: updated.confidence } : d
         ),
       }))
     })

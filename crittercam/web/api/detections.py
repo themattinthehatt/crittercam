@@ -152,7 +152,7 @@ def list_detections(
             {
                 'id': row['id'],
                 'label': row['label'].split(';')[-1],
-                'confidence': round(row['confidence'], 3),
+                'confidence': round(row['confidence'], 3) if row['confidence'] is not None else None,
                 'crop_url': f'/media/{row["crop_path"]}',
                 'individual_id': row['individual_id'],
                 'nickname': row['nickname'],
@@ -207,7 +207,7 @@ def recent_by_species() -> list[dict]:
         {
             'id': row['id'],
             'label': row['label'].split(';')[-1],
-            'confidence': round(row['confidence'], 3),
+            'confidence': round(row['confidence'], 3) if row['confidence'] is not None else None,
             'crop_url': f'/media/{row["crop_path"]}',
             'captured_at': row['captured_at'],
             'media_id': row['media_id'],
