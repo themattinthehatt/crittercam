@@ -44,7 +44,7 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
             selectable; stopPropagation prevents the card's onClick from also firing. */}
         <input
           type="checkbox"
-          className="checkbox checkbox-xs absolute top-1.5 right-1.5 bg-white border-white/70"
+          className="checkbox checkbox-xs absolute top-1.5 right-1.5 bg-white/25 border-white/30 checked:bg-primary checked:border-primary"
           checked={batchSelected}
           onChange={() => {}}
           onClick={e => { e.stopPropagation(); onBatchSelect?.() }}
