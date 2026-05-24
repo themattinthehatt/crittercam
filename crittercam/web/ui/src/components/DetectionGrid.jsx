@@ -3,6 +3,7 @@ import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection } fro
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
+import BatchActionBar from './BatchActionBar.jsx'
 import Button from './Button.jsx'
 import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
 
@@ -22,6 +23,12 @@ export default function DetectionGrid() {
   // incrementing refreshKey re-triggers the fetch effect without changing
   // any filter, used to repopulate the grid after a deletion.
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // batch selection — a Set of detection ids the user has checked.
+  // batchMode is true whenever the set is non-empty; in that mode card clicks
+  // toggle batch membership instead of opening the detail modal.
+  const [batchSelectedIds, setBatchSelectedIds] = useState(new Set())
+  const batchMode = batchSelectedIds.size > 0
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -53,12 +60,18 @@ export default function DetectionGrid() {
       .then(data => setSelectedDetection(data))
   }, [selectedId])
 
+  // entering batch mode closes the detail modal — having both open is confusing.
+  useEffect(() => {
+    if (batchMode) setSelectedId(null)
+  }, [batchMode])
+
   // re-fetch whenever page or any filter changes.
   // URLSearchParams builds the query string cleanly: it only adds a key
   // when we append it, so omitted filters don't appear in the URL at all.
   useEffect(() => {
     setResult(null)
     setSelectedId(null)
+    setBatchSelectedIds(new Set())
 
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
@@ -133,6 +146,21 @@ export default function DetectionGrid() {
     })
   }
 
+  const toggleBatch = id => {
+    setBatchSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // star is solid when every selected detection is already favorited.
+  const allFavorited = batchMode && result !== null &&
+    [...batchSelectedIds].every(id =>
+      result.detections.find(d => d.id === id)?.favorite === 1
+    )
+
   const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
     setBrowseMode(bm)
     setSpecies(sp)
@@ -160,6 +188,16 @@ export default function DetectionGrid() {
           <div>Loading…</div>
         ) : (
           <>
+            {batchMode && (
+              <BatchActionBar
+                count={batchSelectedIds.size}
+                allFavorited={allFavorited}
+                onClear={() => setBatchSelectedIds(new Set())}
+                onDelete={null}
+                onFavorite={null}
+                onEdit={null}
+              />
+            )}
             <div className="grid grid-cols-4 gap-3">
               {result.detections.map(detection => (
                 <DetectionCard
@@ -168,13 +206,18 @@ export default function DetectionGrid() {
                   label={detection.label.split(';').pop()}
                   confidence={detection.confidence}
                   capturedAt={detection.captured_at}
-                  selected={selectedId === detection.id}
-                  onClick={() => setSelectedId(detection.id)}
+                  selected={!batchMode && selectedId === detection.id}
+                  onClick={batchMode
+                    ? () => toggleBatch(detection.id)
+                    : () => setSelectedId(detection.id)
+                  }
                   isFavorite={detection.favorite === 1}
                   onFavorite={() => toggleFavoriteInList(
                     detection,
                     updater => setResult(prev => ({ ...prev, detections: updater(prev.detections) })),
                   )}
+                  batchSelected={batchSelectedIds.has(detection.id)}
+                  onBatchSelect={() => toggleBatch(detection.id)}
                 />
               ))}
             </div>

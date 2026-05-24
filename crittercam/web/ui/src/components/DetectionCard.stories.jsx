@@ -69,6 +69,42 @@ export const LongLabel = {
   },
 }
 
+// batch-selectable card — checkbox visible, not yet checked
+export const BatchSelectable = {
+  args: {
+    cropUrl: 'https://placehold.co/300x200',
+    label: 'white-tailed deer',
+    confidence: 0.91,
+    capturedAt: '2026-03-14T02:17:00',
+    batchSelected: false,
+    onClick: fn(),
+    onBatchSelect: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    const checkbox = canvas.getByRole('checkbox')
+    // clicking checkbox fires onBatchSelect, not onClick
+    await userEvent.click(checkbox)
+    await expect(args.onBatchSelect).toHaveBeenCalledOnce()
+    await expect(args.onClick).not.toHaveBeenCalled()
+    // clicking the image fires onClick
+    await userEvent.click(canvas.getByRole('img'))
+    await expect(args.onClick).toHaveBeenCalledOnce()
+  },
+}
+
+// card with batch selection active — primary ring + checked checkbox
+export const BatchSelected = {
+  args: {
+    cropUrl: 'https://placehold.co/300x200',
+    label: 'white-tailed deer',
+    confidence: 0.91,
+    capturedAt: '2026-03-14T02:17:00',
+    batchSelected: true,
+    onBatchSelect: fn(),
+  },
+}
+
 export const Favorited = {
   args: {
     cropUrl: 'https://placehold.co/300x200',
