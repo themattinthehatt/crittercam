@@ -1,6 +1,7 @@
 """Detections API endpoints — filterable detection list and single-detection detail."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from crittercam.web.api import get_conn
 
@@ -227,7 +228,8 @@ def get_detection(detection_id: int) -> dict:
         SELECT d.id, d.label, d.confidence, d.crop_path,
                d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
                d.individual_id, ind.nickname,
-               i.path AS image_path, i.captured_at, i.temperature_c
+               i.id AS media_id, i.path AS image_path,
+               i.captured_at, i.temperature_c, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
@@ -289,6 +291,45 @@ def get_detection(detection_id: int) -> dict:
         'temperature_c': row['temperature_c'],
         'individual_id': row['individual_id'],
         'nickname': row['nickname'],
+        'media_id': row['media_id'],
+        'favorite': row['favorite'],
         'prev_id': prev_row['id'] if prev_row else None,
         'next_id': next_row['id'] if next_row else None,
     }
+
+
+class FavoritePayload(BaseModel):
+    """Request body for the set_favorite endpoint."""
+
+    favorite: int
+
+
+@router.patch('/api/media/{media_id}/favorite')
+def set_favorite(media_id: int, payload: FavoritePayload) -> dict:
+    """Set or clear the favorite flag on a media item.
+
+    Args:
+        media_id: primary key of the media row
+        payload: dict with 'favorite' key (0 or 1)
+
+    Returns:
+        dict with media_id and updated favorite value
+
+    Raises:
+        HTTPException: 404 if the media item does not exist
+    """
+    conn = get_conn()
+
+    row = conn.execute('SELECT id FROM media WHERE id = :id', {'id': media_id}).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f'media {media_id} not found')
+
+    conn.execute(
+        'UPDATE media SET favorite = :favorite WHERE id = :id',
+        {'favorite': payload.favorite, 'id': media_id},
+    )
+    conn.commit()
+    conn.close()
+
+    return {'media_id': media_id, 'favorite': payload.favorite}

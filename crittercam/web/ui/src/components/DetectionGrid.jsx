@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toggleFavorite } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
@@ -175,6 +176,8 @@ export default function DetectionGrid() {
           hasNext={hasNext}
           onPrev={handlePrev}
           onNext={handleNext}
+          isFavorite={selectedDetection.favorite === 1}
+          onFavorite={() => toggleFavorite(selectedDetection, setSelectedDetection)}
         />
       )}
     </div>
