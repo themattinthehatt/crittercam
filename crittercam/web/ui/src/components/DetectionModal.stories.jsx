@@ -235,6 +235,31 @@ export const EditCancel = {
   },
 }
 
+// after save, modal exits edit mode and shows the updated species label.
+// regression guard: the parent (DetectionGrid / RecentBySpecies) must spread
+// BOTH label AND confidence into the list item after onSave resolves — spreading
+// only label left the card's confidence badge stale.
+export const EditSaveExitsMode = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Edit'))
+    await userEvent.selectOptions(canvas.getAllByRole('combobox')[0], 'domestic cat')
+    await userEvent.click(canvas.getByRole('button', { name: 'save' }))
+    // modal is back in view mode
+    await expect(canvas.queryByText('editing')).not.toBeInTheDocument()
+    // onSave was called once with the new leaf — parent must use both leaf
+    // and the returned confidence (null for human saves) to update the card
+    await expect(args.onSave).toHaveBeenCalledOnce()
+  },
+}
+
 // detection with an existing individual — individual dropdown pre-populated
 export const EditModeWithIndividual = {
   args: {
