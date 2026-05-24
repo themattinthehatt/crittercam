@@ -3,13 +3,12 @@ import DetectionModal from './DetectionModal'
 export default {
   title: 'Domain/DetectionModal',
   component: DetectionModal,
-  decorators: [
-    Story => (
-      <div style={{ width: '300px' }}>
-        <Story />
-      </div>
-    ),
-  ],
+  // modal uses fixed positioning so no width constraint is needed
+  args: {
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+  },
 }
 
 const BASE = {
@@ -22,17 +21,41 @@ const BASE = {
   temperature_c: 4.2,
   individual_id: null,
   nickname: null,
+  bbox: { x: 0.2, y: 0.25, w: 0.35, h: 0.45 },
 }
 
-export const WithBbox = {
+// middle of a list — both arrows visible
+export const Middle = {
   args: {
-    detection: { ...BASE, bbox: { x: 0.2, y: 0.25, w: 0.35, h: 0.45 } },
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+  },
+}
+
+// first item in a list — only next arrow
+export const First = {
+  args: {
+    detection: BASE,
+    hasPrev: false,
+    hasNext: true,
+  },
+}
+
+// last item in a list — only prev arrow
+export const Last = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: false,
   },
 }
 
 export const NoBbox = {
   args: {
     detection: { ...BASE, bbox: null },
+    hasPrev: true,
+    hasNext: true,
   },
 }
 
@@ -40,16 +63,19 @@ export const WithIndividual = {
   args: {
     detection: {
       ...BASE,
-      bbox: { x: 0.2, y: 0.25, w: 0.35, h: 0.45 },
       individual_id: 3,
       nickname: 'Mittens',
     },
+    hasPrev: true,
+    hasNext: true,
   },
 }
 
 export const NoTemperature = {
   args: {
     detection: { ...BASE, bbox: null, temperature_c: null },
+    hasPrev: true,
+    hasNext: true,
   },
 }
 
@@ -63,5 +89,7 @@ export const Blank = {
       bbox: null,
       temperature_c: null,
     },
+    hasPrev: true,
+    hasNext: true,
   },
 }

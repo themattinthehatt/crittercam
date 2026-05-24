@@ -1,6 +1,8 @@
 // DetectionModal is a presentational component — it receives a fully-loaded
 // detection object and renders it. The parent (DetectionGrid) owns the fetch.
-export default function DetectionModal({ detection, onClose }) {
+// hasPrev/hasNext control whether nav arrows are rendered; onPrev/onNext are
+// called when the user clicks them.
+export default function DetectionModal({ detection, onClose, hasPrev = false, hasNext = false, onPrev, onNext }) {
   // label is stored as a semicolon-joined taxonomy path like
   // "animalia;chordata;mammalia;...;vulpes vulpes"; take only the last part.
   const label = detection.label.split(';').pop()
@@ -16,12 +18,33 @@ export default function DetectionModal({ detection, onClose }) {
         onClick={e => e.stopPropagation()}
       >
 
-        {/* left column (~75%) — crop image, centered in a dark letterbox */}
-        <div className="flex-[3] bg-base-300 flex items-center justify-center p-6">
+        {/* left column (~75%) — crop image centered in a dark letterbox.
+            relative here so the nav arrows can be anchored to its edges. */}
+        <div className="relative flex-[3] bg-base-300 flex items-center justify-center p-6">
           {detection.crop_url
             ? <img className="max-w-full max-h-full object-contain rounded" src={detection.crop_url} alt={label} />
             : <span className="text-sm text-base-content/40">no crop</span>
           }
+
+          {/* prev/next arrows — only rendered when navigation is available.
+              bg-black/30 keeps them visible against any image without being
+              distracting; hover darkens slightly for feedback. */}
+          {hasPrev && (
+            <button
+              className="absolute left-3 top-1/2 -translate-y-1/2 btn btn-circle bg-black/30 hover:bg-black/50 border-none text-white text-xl"
+              onClick={e => { e.stopPropagation(); onPrev() }}
+            >
+              ‹
+            </button>
+          )}
+          {hasNext && (
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-circle bg-black/30 hover:bg-black/50 border-none text-white text-xl"
+              onClick={e => { e.stopPropagation(); onNext() }}
+            >
+              ›
+            </button>
+          )}
         </div>
 
         {/* right column (~25%) — full frame + metadata, scrollable */}
