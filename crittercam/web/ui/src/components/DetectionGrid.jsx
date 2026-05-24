@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList, deleteMedia, patchDetection, patchFavorite } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
@@ -163,6 +163,24 @@ export default function DetectionGrid() {
     setRefreshKey(k => k + 1)
   }
 
+  const handleBatchFavorite = () => {
+    const newValue = allFavorited ? 0 : 1
+    // optimistic update — cards reflect the change immediately
+    setResult(prev => prev && ({
+      ...prev,
+      detections: prev.detections.map(d =>
+        batchSelectedIds.has(d.id) ? { ...d, favorite: newValue } : d
+      ),
+    }))
+    // deduplicate media_ids — multiple detections can share one media item
+    const mediaIds = [...new Set(
+      [...batchSelectedIds]
+        .map(id => result.detections.find(d => d.id === id)?.media_id)
+        .filter(Boolean)
+    )]
+    for (const mid of mediaIds) patchFavorite(mid, newValue)
+  }
+
   const toggleBatch = id => {
     setBatchSelectedIds(prev => {
       const next = new Set(prev)
@@ -211,7 +229,7 @@ export default function DetectionGrid() {
                 allFavorited={allFavorited}
                 onClear={() => { setBatchSelectedIds(new Set()); setShowBatchDeleteConfirm(false) }}
                 onDelete={() => setShowBatchDeleteConfirm(true)}
-                onFavorite={null}
+                onFavorite={handleBatchFavorite}
                 onEdit={null}
                 showDeleteConfirm={showBatchDeleteConfirm}
                 onDeleteConfirm={handleBatchDelete}
