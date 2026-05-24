@@ -200,3 +200,70 @@ class TestMigrate:
             "SELECT name FROM sqlite_master WHERE name='should_not_exist'"
         ).fetchone()
         assert row is None
+
+
+class TestFavoriteColumn:
+    """Test the favorite column on the media table."""
+
+    def test_favorite_column_exists(self, db):
+        # Assert — column present in the canonical schema
+        cols = {row['name'] for row in db.execute('PRAGMA table_info(media)')}
+        assert 'favorite' in cols
+
+    # minimal valid row — only NOT NULL columns without defaults
+    MEDIA_ROW = {
+        'path': '/media/2026/01/01/img001.jpg',
+        'filename': 'img001.jpg',
+        'ingested_at': '2026-01-01T00:00:00',
+        'file_hash': 'abc123',
+        'file_size': 1024,
+    }
+
+    def test_favorite_defaults_to_false(self, db):
+        # Arrange
+        db.execute(
+            'INSERT INTO media (path, filename, ingested_at, file_hash, file_size)'
+            ' VALUES (:path, :filename, :ingested_at, :file_hash, :file_size)',
+            self.MEDIA_ROW,
+        )
+        db.commit()
+
+        # Act
+        row = db.execute('SELECT favorite FROM media WHERE path = :path', {'path': self.MEDIA_ROW['path']}).fetchone()
+
+        # Assert
+        assert row['favorite'] == 0
+
+    def test_favorite_can_be_set(self, db):
+        # Arrange
+        db.execute(
+            'INSERT INTO media (path, filename, ingested_at, file_hash, file_size)'
+            ' VALUES (:path, :filename, :ingested_at, :file_hash, :file_size)',
+            self.MEDIA_ROW,
+        )
+        db.commit()
+
+        # Act
+        db.execute('UPDATE media SET favorite = 1 WHERE path = :path', {'path': self.MEDIA_ROW['path']})
+        db.commit()
+        row = db.execute('SELECT favorite FROM media WHERE path = :path', {'path': self.MEDIA_ROW['path']}).fetchone()
+
+        # Assert
+        assert row['favorite'] == 1
+
+    def test_favorite_can_be_cleared(self, db):
+        # Arrange — insert already favorited
+        db.execute(
+            'INSERT INTO media (path, filename, ingested_at, file_hash, file_size, favorite)'
+            ' VALUES (:path, :filename, :ingested_at, :file_hash, :file_size, 1)',
+            self.MEDIA_ROW,
+        )
+        db.commit()
+
+        # Act
+        db.execute('UPDATE media SET favorite = 0 WHERE path = :path', {'path': self.MEDIA_ROW['path']})
+        db.commit()
+        row = db.execute('SELECT favorite FROM media WHERE path = :path', {'path': self.MEDIA_ROW['path']}).fetchone()
+
+        # Assert
+        assert row['favorite'] == 0
