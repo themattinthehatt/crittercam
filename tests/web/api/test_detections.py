@@ -242,3 +242,24 @@ class TestPatchDetection:
         full_label = response.json()['label']
         assert ';' in full_label
         assert full_label.endswith('vulpes vulpes')
+
+    def test_patch_removes_detection_from_previous_species_filter(self, client, db):
+        """After patching species, the detection must not appear under the old species filter.
+
+        This is the scenario that motivated refreshing the grid after a single-detection
+        save: if filtered to 'vulpes vulpes' and the user relabels a detection as
+        'domestic cat', that card should disappear from the filtered view on save.
+        """
+        cat_label = 'xyz;animalia;chordata;mammalia;carnivora;felidae;felis;domestic cat'
+        fox_label = 'abc;animalia;chordata;mammalia;carnivora;canidae;vulpes;vulpes vulpes'
+        _insert_media(db)
+        _insert_detection(db, det_id=1, label=fox_label)
+        # a second fox detection gives the PATCH endpoint a label to resolve 'domestic cat' from
+        _insert_detection(db, det_id=2, label=cat_label, crop_path='derived/2026/01/01/det0002.jpg')
+
+        client.patch('/api/detections/1', json={'species_leaf': 'domestic cat', 'individual_id': None})
+
+        fox_response = client.get('/api/detections?species=vulpes+vulpes')
+        cat_response = client.get('/api/detections?species=domestic+cat')
+        assert fox_response.json()['total'] == 0
+        assert cat_response.json()['total'] == 2

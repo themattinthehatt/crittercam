@@ -140,14 +140,9 @@ export default function DetectionGrid() {
   }
 
   const handleSave = (speciesLeaf, individualId) => {
-    patchDetection(selectedDetection.id, speciesLeaf, individualId).then(updated => {
-      setSelectedDetection(updated)
-      setResult(prev => prev && ({
-        ...prev,
-        detections: prev.detections.map(d =>
-          d.id === updated.id ? { ...d, label: updated.label, confidence: updated.confidence } : d
-        ),
-      }))
+    patchDetection(selectedDetection.id, speciesLeaf, individualId).then(() => {
+      setSelectedId(null)
+      setRefreshKey(k => k + 1)
     })
   }
 
