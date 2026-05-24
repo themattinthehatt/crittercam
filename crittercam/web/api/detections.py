@@ -68,6 +68,7 @@ def list_detections(
     individual_id: int | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    only_favorites: bool = False,
 ) -> dict:
     """Return a paginated, filterable list of active detections for the thumbnail grid.
 
@@ -77,6 +78,7 @@ def list_detections(
         species: leaf species name to filter by (e.g. 'vulpes vulpes'); omit for all
         date_from: ISO date string (YYYY-MM-DD) — include detections on or after this date
         date_to: ISO date string (YYYY-MM-DD) — include detections on or before this date
+        only_favorites: if True, restrict to detections whose media is marked favorite
 
     Returns:
         dict with 'detections' list, 'total' count, 'page', and 'page_size'
@@ -112,6 +114,9 @@ def list_detections(
         # date(:date_to, '+1 day') shifts the boundary to include all times on date_to
         conditions.append("i.captured_at < date(:date_to, '+1 day')")
         params['date_to'] = date_to
+
+    if only_favorites:
+        conditions.append('i.favorite = 1')
 
     where = ' AND '.join(conditions)
 

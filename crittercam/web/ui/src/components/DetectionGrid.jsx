@@ -58,6 +58,7 @@ export default function DetectionGrid() {
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
     if (browseMode === 'individual' && individual) params.append('individual_id', individual)
+    if (browseMode === 'favorited') params.append('only_favorites', 'true')
     if (dateFrom) params.append('date_from', dateFrom)
     if (dateTo) params.append('date_to', dateTo)
 

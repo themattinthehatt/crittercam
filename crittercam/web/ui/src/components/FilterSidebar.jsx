@@ -45,10 +45,11 @@ export default function FilterSidebar({
         >
           <option value="species">species</option>
           <option value="individual">individual</option>
+          <option value="favorited">favorited</option>
         </select>
       </label>
 
-      {browseMode === 'species' ? (
+      {browseMode !== 'favorited' && (browseMode === 'species' ? (
         <label className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-wide text-base-content/50">species</span>
           <select
@@ -78,7 +79,7 @@ export default function FilterSidebar({
             ))}
           </select>
         </label>
-      )}
+      ))}
 
       <label className="flex flex-col gap-1">
         <span className="text-xs uppercase tracking-wide text-base-content/50">from</span>

@@ -76,6 +76,19 @@ export const IndividualSelected = {
   },
 }
 
+export const FavoritedMode = {
+  args: {
+    browseMode: 'favorited',
+    species: SPECIES,
+    selectedSpecies: '',
+    individuals: INDIVIDUALS,
+    selectedIndividual: '',
+    dateFrom: '',
+    dateTo: '',
+    onChange: () => {},
+  },
+}
+
 export const WithDateRange = {
   args: {
     browseMode: 'species',
