@@ -1,15 +1,39 @@
 import { useState } from 'react'
-import { StarIcon, TrashIcon } from './icons.jsx'
+import { StarIcon, TrashIcon, PencilIcon } from './icons.jsx'
 
 // DetectionModal is a presentational component — it receives a fully-loaded
 // detection object and renders it. The parent (DetectionGrid) owns the fetch.
 // hasPrev/hasNext control whether nav arrows are rendered; onPrev/onNext are
 // called when the user clicks them.
-export default function DetectionModal({ detection, onClose, hasPrev = false, hasNext = false, onPrev, onNext, isFavorite = false, onFavorite, onDelete }) {
+// speciesList and individualList are used only in edit mode; onSave is called
+// with (species_leaf, individual_id) when the user confirms edits.
+export default function DetectionModal({
+  detection, onClose, hasPrev = false, hasNext = false, onPrev, onNext,
+  isFavorite = false, onFavorite, onDelete,
+  speciesList = [], individualList = [], onSave,
+}) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editSpecies, setEditSpecies] = useState('')
+  const [editIndividual, setEditIndividual] = useState(null)
+
   // label is stored as a semicolon-joined taxonomy path like
   // "animalia;chordata;mammalia;...;vulpes vulpes"; take only the last part.
   const label = detection.label.split(';').pop()
+
+  const startEditing = () => {
+    setEditSpecies(label)
+    setEditIndividual(detection.individual_id)
+    setShowDeleteConfirm(false)
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => setIsEditing(false)
+
+  const handleSave = () => {
+    onSave?.(editSpecies, editIndividual)
+    setIsEditing(false)
+  }
 
   return (
     // fixed overlay covers the full viewport above everything else.
@@ -54,8 +78,8 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
         {/* right column (~25%) — full frame + metadata, scrollable */}
         <div className="flex-1 flex flex-col border-l border-base-300 overflow-y-auto">
 
-          {/* top bar: action buttons left, close right.
-              switches to an inline confirmation when trash is clicked. */}
+          {/* top bar: switches between three mutually exclusive states —
+              normal (trash/star/pencil), delete confirmation, and edit mode. */}
           <div className="flex items-center justify-between p-3 min-h-[48px]">
             {showDeleteConfirm ? (
               <>
@@ -75,6 +99,24 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
                   </button>
                 </div>
               </>
+            ) : isEditing ? (
+              <>
+                <span className="text-sm text-base-content/60">editing</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-xs btn-ghost border border-base-content/20"
+                    onClick={handleCancel}
+                  >
+                    cancel
+                  </button>
+                  <button
+                    className="btn btn-xs btn-primary"
+                    onClick={handleSave}
+                  >
+                    save
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <div className="flex items-center gap-2">
@@ -84,6 +126,13 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
                     title="Delete"
                   >
                     <TrashIcon className="size-5" />
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost text-base-content/60"
+                    onClick={startEditing}
+                    title="Edit"
+                  >
+                    <PencilIcon className="size-5" />
                   </button>
                   <button
                     className={`btn btn-sm btn-ghost ${isFavorite ? 'text-yellow-400' : 'text-base-content/40'}`}
@@ -126,11 +175,23 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
             </div>
           </div>
 
-          {/* metadata */}
+          {/* metadata — species and individual rows become dropdowns in edit mode */}
           <div className="px-4 pb-6 text-sm flex flex-col gap-1.5">
-            <div className="flex gap-2">
-              <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0 pt-0.5">species</span>
-              <span className="capitalize">{label}</span>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0">species</span>
+              {isEditing ? (
+                <select
+                  className="select select-xs select-bordered flex-1 capitalize"
+                  value={editSpecies}
+                  onChange={e => setEditSpecies(e.target.value)}
+                >
+                  {speciesList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="capitalize pt-0.5">{label}</span>
+              )}
             </div>
             <div className="flex gap-2">
               <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0 pt-0.5">confidence</span>
@@ -148,14 +209,31 @@ export default function DetectionModal({ detection, onClose, hasPrev = false, ha
                 <span>{detection.temperature_c}°C</span>
               </div>
             )}
-            {detection.individual_id !== null && (
-              <div className="flex gap-2 mt-3">
-                <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0 pt-0.5">individual</span>
-                <span>
-                  {detection.nickname
-                    ? `${detection.nickname} (id ${detection.individual_id})`
-                    : `id ${detection.individual_id}`}
-                </span>
+            {/* individual row: always visible in edit mode so the user can assign one;
+                only visible in view mode when a value is already set. */}
+            {(isEditing || detection.individual_id !== null) && (
+              <div className="flex gap-2 mt-3 items-center">
+                <span className="text-xs uppercase tracking-wide text-base-content/40 w-20 flex-shrink-0">individual</span>
+                {isEditing ? (
+                  <select
+                    className="select select-xs select-bordered flex-1"
+                    value={editIndividual ?? ''}
+                    onChange={e => setEditIndividual(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                  >
+                    <option value="">— none —</option>
+                    {individualList.map(ind => (
+                      <option key={ind.id} value={ind.id}>
+                        {ind.nickname ? `${ind.nickname} (id ${ind.id})` : `id ${ind.id}`}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span>
+                    {detection.nickname
+                      ? `${detection.nickname} (id ${detection.individual_id})`
+                      : `id ${detection.individual_id}`}
+                  </span>
+                )}
               </div>
             )}
           </div>

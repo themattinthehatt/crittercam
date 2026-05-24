@@ -1,12 +1,28 @@
 import { fn, userEvent, expect, within } from 'storybook/test'
 import DetectionModal from './DetectionModal'
 
+const SPECIES_LIST = [
+  'domestic cat',
+  'red fox',
+  'virginia opossum',
+  'vulpes vulpes',
+  'white-tailed deer',
+]
+
+const INDIVIDUAL_LIST = [
+  { id: 1, species_leaf: 'domestic cat', nickname: 'Mittens' },
+  { id: 2, species_leaf: 'red fox', nickname: null },
+  { id: 3, species_leaf: 'red fox', nickname: 'Bandit' },
+]
+
 export default {
   title: 'Domain/DetectionModal',
   component: DetectionModal,
   // modal uses fixed positioning so no width constraint is needed
   args: {
     isFavorite: false,
+    speciesList: SPECIES_LIST,
+    individualList: INDIVIDUAL_LIST,
   },
 }
 
@@ -23,6 +39,15 @@ const BASE = {
   bbox: { x: 0.2, y: 0.25, w: 0.35, h: 0.45 },
 }
 
+const CALLBACKS = {
+  onClose: () => {},
+  onPrev: () => {},
+  onNext: () => {},
+  onFavorite: () => {},
+  onDelete: () => {},
+  onSave: () => {},
+}
+
 // middle of a list — both arrows visible, not favorited
 export const Middle = {
   args: {
@@ -30,11 +55,10 @@ export const Middle = {
     hasPrev: true,
     hasNext: true,
     isFavorite: false,
+    ...CALLBACKS,
     onClose: fn(),
     onPrev: fn(),
     onNext: fn(),
-    onFavorite: fn(),
-    onDelete: fn(),
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
@@ -59,11 +83,7 @@ export const Favorited = {
     hasPrev: true,
     hasNext: true,
     isFavorite: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
 }
 
@@ -73,11 +93,7 @@ export const First = {
     detection: BASE,
     hasPrev: false,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
@@ -92,11 +108,7 @@ export const Last = {
     detection: BASE,
     hasPrev: true,
     hasNext: false,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
@@ -112,11 +124,8 @@ export const FavoriteToggle = {
     hasPrev: true,
     hasNext: true,
     isFavorite: false,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
+    ...CALLBACKS,
     onFavorite: fn(),
-    onDelete: () => {},
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
@@ -131,10 +140,7 @@ export const DeleteConfirm = {
     detection: BASE,
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
+    ...CALLBACKS,
     onDelete: fn(),
   },
   play: async ({ canvasElement, args }) => {
@@ -152,10 +158,7 @@ export const DeleteCancel = {
     detection: BASE,
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
+    ...CALLBACKS,
     onDelete: fn(),
   },
   play: async ({ canvasElement, args }) => {
@@ -168,16 +171,91 @@ export const DeleteCancel = {
   },
 }
 
+// clicking pencil enters edit mode — species and individual dropdowns appear
+export const EditMode = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Edit'))
+    await expect(canvas.getByText('editing')).toBeInTheDocument()
+    // species dropdown pre-populated with current leaf
+    const selects = canvas.getAllByRole('combobox')
+    await expect(selects[0]).toHaveValue('vulpes vulpes')
+    // individual dropdown defaults to — none — since detection has no individual
+    await expect(selects[1]).toHaveValue('')
+  },
+}
+
+// changing species and saving calls onSave with the new leaf and individual_id
+export const EditSave = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Edit'))
+    // change species to domestic cat
+    await userEvent.selectOptions(canvas.getAllByRole('combobox')[0], 'domestic cat')
+    // assign Mittens (id 1) as individual
+    await userEvent.selectOptions(canvas.getAllByRole('combobox')[1], '1')
+    await userEvent.click(canvas.getByRole('button', { name: 'save' }))
+    await expect(args.onSave).toHaveBeenCalledWith('domestic cat', 1)
+    // returns to view mode
+    await expect(canvas.queryByText('editing')).not.toBeInTheDocument()
+  },
+}
+
+// cancelling edit mode reverts without calling onSave
+export const EditCancel = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
+    onSave: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Edit'))
+    await userEvent.selectOptions(canvas.getAllByRole('combobox')[0], 'domestic cat')
+    await userEvent.click(canvas.getByRole('button', { name: 'cancel' }))
+    await expect(args.onSave).not.toHaveBeenCalled()
+    // species label reverts to original value
+    await expect(canvas.getByText('vulpes vulpes')).toBeInTheDocument()
+  },
+}
+
+// detection with an existing individual — individual dropdown pre-populated
+export const EditModeWithIndividual = {
+  args: {
+    detection: { ...BASE, individual_id: 3, nickname: 'Bandit' },
+    hasPrev: true,
+    hasNext: true,
+    ...CALLBACKS,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Edit'))
+    const selects = canvas.getAllByRole('combobox')
+    await expect(selects[1]).toHaveValue('3')
+  },
+}
+
 export const NoBbox = {
   args: {
     detection: { ...BASE, bbox: null },
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
 }
 
@@ -190,11 +268,7 @@ export const WithIndividual = {
     },
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
 }
 
@@ -203,11 +277,7 @@ export const NoTemperature = {
     detection: { ...BASE, bbox: null, temperature_c: null },
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
 }
 
@@ -223,10 +293,6 @@ export const Blank = {
     },
     hasPrev: true,
     hasNext: true,
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
+    ...CALLBACKS,
   },
 }
