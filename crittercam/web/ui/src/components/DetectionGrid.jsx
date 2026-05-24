@@ -4,6 +4,7 @@ import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 import BatchActionBar from './BatchActionBar.jsx'
+import BatchEditPanel from './BatchEditPanel.jsx'
 import Button from './Button.jsx'
 import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
 
@@ -30,6 +31,7 @@ export default function DetectionGrid() {
   const [batchSelectedIds, setBatchSelectedIds] = useState(new Set())
   const batchMode = batchSelectedIds.size > 0
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
+  const [showBatchEdit, setShowBatchEdit] = useState(false)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -74,6 +76,7 @@ export default function DetectionGrid() {
     setSelectedId(null)
     setBatchSelectedIds(new Set())
     setShowBatchDeleteConfirm(false)
+    setShowBatchEdit(false)
 
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
@@ -163,6 +166,26 @@ export default function DetectionGrid() {
     setRefreshKey(k => k + 1)
   }
 
+  const handleBatchSave = async (speciesLeaf, editIndividual) => {
+    const detections = [...batchSelectedIds]
+      .map(id => result.detections.find(d => d.id === id))
+      .filter(Boolean)
+    for (const det of detections) {
+      // '' means no change — keep each detection's current species
+      const leaf = speciesLeaf !== '' ? speciesLeaf : det.label.split(';').pop()
+      // 'no-change' means keep each detection's current individual
+      const indId = editIndividual === 'no-change'
+        ? det.individual_id
+        : editIndividual === 'none'
+          ? null
+          : parseInt(editIndividual, 10)
+      await patchDetection(det.id, leaf, indId)
+    }
+    setBatchSelectedIds(new Set())
+    setShowBatchEdit(false)
+    setRefreshKey(k => k + 1)
+  }
+
   const handleBatchFavorite = () => {
     const newValue = allFavorited ? 0 : 1
     // optimistic update — cards reflect the change immediately
@@ -223,17 +246,26 @@ export default function DetectionGrid() {
           <div>Loading…</div>
         ) : (
           <>
-            {batchMode && (
+            {batchMode && !showBatchEdit && (
               <BatchActionBar
                 count={batchSelectedIds.size}
                 allFavorited={allFavorited}
                 onClear={() => { setBatchSelectedIds(new Set()); setShowBatchDeleteConfirm(false) }}
                 onDelete={() => setShowBatchDeleteConfirm(true)}
                 onFavorite={handleBatchFavorite}
-                onEdit={null}
+                onEdit={() => setShowBatchEdit(true)}
                 showDeleteConfirm={showBatchDeleteConfirm}
                 onDeleteConfirm={handleBatchDelete}
                 onDeleteCancel={() => setShowBatchDeleteConfirm(false)}
+              />
+            )}
+            {showBatchEdit && (
+              <BatchEditPanel
+                count={batchSelectedIds.size}
+                speciesList={speciesList}
+                individualList={individualList}
+                onSave={handleBatchSave}
+                onCancel={() => setShowBatchEdit(false)}
               />
             )}
             <div className="grid grid-cols-4 gap-3">
