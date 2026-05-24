@@ -1,3 +1,4 @@
+import { fn, userEvent, expect, within } from 'storybook/test'
 import DetectionModal from './DetectionModal'
 
 export default {
@@ -5,11 +6,6 @@ export default {
   component: DetectionModal,
   // modal uses fixed positioning so no width constraint is needed
   args: {
-    onClose: () => {},
-    onPrev: () => {},
-    onNext: () => {},
-    onFavorite: () => {},
-    onDelete: () => {},
     isFavorite: false,
   },
 }
@@ -34,6 +30,25 @@ export const Middle = {
     hasPrev: true,
     hasNext: true,
     isFavorite: false,
+    onClose: fn(),
+    onPrev: fn(),
+    onNext: fn(),
+    onFavorite: fn(),
+    onDelete: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    // both nav arrows present
+    await expect(canvas.getByText('‹')).toBeInTheDocument()
+    await expect(canvas.getByText('›')).toBeInTheDocument()
+    // clicking prev/next fires the right callbacks
+    await userEvent.click(canvas.getByText('‹'))
+    await expect(args.onPrev).toHaveBeenCalledOnce()
+    await userEvent.click(canvas.getByText('›'))
+    await expect(args.onNext).toHaveBeenCalledOnce()
+    // close button fires onClose
+    await userEvent.click(canvas.getByRole('button', { name: '✕' }))
+    await expect(args.onClose).toHaveBeenCalledOnce()
   },
 }
 
@@ -44,6 +59,11 @@ export const Favorited = {
     hasPrev: true,
     hasNext: true,
     isFavorite: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
   },
 }
 
@@ -53,6 +73,16 @@ export const First = {
     detection: BASE,
     hasPrev: false,
     hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.queryByText('‹')).not.toBeInTheDocument()
+    await expect(canvas.getByText('›')).toBeInTheDocument()
   },
 }
 
@@ -62,6 +92,79 @@ export const Last = {
     detection: BASE,
     hasPrev: true,
     hasNext: false,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText('‹')).toBeInTheDocument()
+    await expect(canvas.queryByText('›')).not.toBeInTheDocument()
+  },
+}
+
+// clicking the star calls onFavorite
+export const FavoriteToggle = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    isFavorite: false,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: fn(),
+    onDelete: () => {},
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Favorite'))
+    await expect(args.onFavorite).toHaveBeenCalledOnce()
+  },
+}
+
+// clicking trash shows confirmation; clicking delete fires onDelete
+export const DeleteConfirm = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Delete'))
+    await expect(canvas.getByText('Delete this observation?')).toBeInTheDocument()
+    await userEvent.click(canvas.getByRole('button', { name: 'delete' }))
+    await expect(args.onDelete).toHaveBeenCalledOnce()
+  },
+}
+
+// clicking trash then cancel dismisses without calling onDelete
+export const DeleteCancel = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByTitle('Delete'))
+    await expect(canvas.getByText('Delete this observation?')).toBeInTheDocument()
+    await userEvent.click(canvas.getByRole('button', { name: 'cancel' }))
+    await expect(canvas.queryByText('Delete this observation?')).not.toBeInTheDocument()
+    await expect(args.onDelete).not.toHaveBeenCalled()
   },
 }
 
@@ -70,6 +173,11 @@ export const NoBbox = {
     detection: { ...BASE, bbox: null },
     hasPrev: true,
     hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
   },
 }
 
@@ -82,6 +190,11 @@ export const WithIndividual = {
     },
     hasPrev: true,
     hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
   },
 }
 
@@ -90,6 +203,11 @@ export const NoTemperature = {
     detection: { ...BASE, bbox: null, temperature_c: null },
     hasPrev: true,
     hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
   },
 }
 
@@ -105,5 +223,10 @@ export const Blank = {
     },
     hasPrev: true,
     hasNext: true,
+    onClose: () => {},
+    onPrev: () => {},
+    onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
   },
 }

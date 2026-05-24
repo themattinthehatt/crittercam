@@ -114,3 +114,17 @@ npm --prefix crittercam/web/ui run storybook
 Then open `http://localhost:6006` in the browser. The main dashboard and Storybook can run simultaneously on their separate ports (5173 and 6006).
 
 Component files and their story files live together in `crittercam/web/ui/src/components/`. See `design/STORYBOOK.md` for the component inventory and development workflow.
+
+### 4. Run frontend tests
+
+Interactive components have `play` functions in their story files that verify callback behaviour (clicks fire the right handlers, `stopPropagation` holds, confirmation dialogs appear and dismiss correctly). Run them headlessly from the repo root:
+
+```bash
+conda run -n critter npx --prefix crittercam/web/ui vitest run
+```
+
+This launches a headless Chromium browser via Playwright, renders each story, executes any `play` function, and reports pass/fail — no running API server required. A clean run currently takes around 5 seconds.
+
+To debug a failing interaction visually, open Storybook (`npm --prefix crittercam/web/ui run storybook`), navigate to the story, and inspect the **Interactions** panel at the bottom of the canvas.
+
+Stories without a `play` function still run as render smoke-tests — they pass if the component mounts without throwing.

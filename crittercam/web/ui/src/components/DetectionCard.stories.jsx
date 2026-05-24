@@ -1,3 +1,4 @@
+import { fn, userEvent, expect, within } from 'storybook/test'
 import DetectionCard from './DetectionCard'
 
 export default {
@@ -21,6 +22,13 @@ export const Default = {
     label: 'white-tailed deer',
     confidence: 0.91,
     capturedAt: '2026-03-14T02:17:00',
+    onClick: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    // clicking the card fires onClick
+    await userEvent.click(canvas.getByRole('img'))
+    await expect(args.onClick).toHaveBeenCalledOnce()
   },
 }
 
@@ -68,6 +76,15 @@ export const Favorited = {
     confidence: 0.91,
     capturedAt: '2026-03-14T02:17:00',
     isFavorite: true,
-    onFavorite: () => {},
+    onClick: fn(),
+    onFavorite: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    // clicking the star fires onFavorite but NOT onClick (stopPropagation)
+    const star = canvas.getByRole('button')
+    await userEvent.click(star)
+    await expect(args.onFavorite).toHaveBeenCalledOnce()
+    await expect(args.onClick).not.toHaveBeenCalled()
   },
 }

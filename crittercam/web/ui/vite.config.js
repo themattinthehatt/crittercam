@@ -11,6 +11,9 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ['storybook/test'],
+  },
   server: {
     proxy: {
       // any request from the browser starting with /api or /media
@@ -37,7 +40,7 @@ export default defineConfig({
           instances: [{
             browser: 'chromium'
           }]
-        }
+        },
       }
     }]
   }
