@@ -4,6 +4,7 @@ import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 import Button from './Button.jsx'
+import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
@@ -155,7 +156,7 @@ export default function DetectionGrid() {
 
             <div className="flex items-center justify-center gap-4 mt-5">
               <Button
-                label="← prev"
+                label={<MoveLeftIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p - 1)}
                 disabled={page === 1}
@@ -164,7 +165,7 @@ export default function DetectionGrid() {
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
               <Button
-                label="next →"
+                label={<MoveRightIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page === Math.ceil(result.total / result.page_size)}

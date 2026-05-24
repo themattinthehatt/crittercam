@@ -1,3 +1,5 @@
+import Button from './Button.jsx'
+
 // FilterSidebar uses controlled inputs throughout — every input has a value=
 // prop (what React renders) and an onChange= prop (how React hears changes).
 // This makes React state the single source of truth: the parent always knows
@@ -102,9 +104,7 @@ export default function FilterSidebar({
       </label>
 
       {hasFilters && (
-        <button className="btn btn-sm btn-ghost self-start" onClick={handleClear}>
-          clear filters
-        </button>
+        <Button label="clear filters" variant="ghost" size="sm" onClick={handleClear} />
       )}
     </div>
   )
