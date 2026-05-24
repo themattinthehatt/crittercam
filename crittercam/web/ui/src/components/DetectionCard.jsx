@@ -1,4 +1,5 @@
 import Badge from './Badge'
+import { StarIcon } from './icons.jsx'
 
 // formatTimestamp converts an ISO string like '2026-03-14T02:17:00' to
 // a readable form like 'Mar 14 · 2:17 AM'. Returns null if no value is given.
@@ -13,7 +14,7 @@ function formatTimestamp(iso) {
 // DetectionCard is a presentational component — it receives already-parsed data
 // and renders it. label should be the leaf of the taxonomy string (e.g.
 // 'white-tailed deer'), not the full semicolon-delimited path.
-export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick, selected = false }) {
+export default function DetectionCard({ cropUrl, label, confidence, capturedAt, onClick, selected = false, isFavorite = false, onFavorite }) {
   const isBlank = label === 'blank'
   const timestamp = formatTimestamp(capturedAt)
 
@@ -46,9 +47,15 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
             />
           )}
         </div>
-        {timestamp && (
-          <span className="text-xs text-base-content/40 mt-1 block">{timestamp}</span>
-        )}
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-xs text-base-content/40">{timestamp ?? ''}</span>
+          <button
+            className={`p-0 bg-transparent border-none cursor-pointer ${isFavorite ? 'text-yellow-400' : 'text-base-content/20'}`}
+            onClick={e => { e.stopPropagation(); onFavorite?.() }}
+          >
+            <StarIcon className={`size-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+          </button>
+        </div>
       </div>
     </div>
   )

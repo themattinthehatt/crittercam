@@ -8,7 +8,7 @@ export default {
   // story reflects how the component actually appears in the app.
   decorators: [
     Story => (
-      <div style={{ width: '160px' }}>
+      <div style={{ width: '240px' }}>
         <Story />
       </div>
     ),
@@ -58,5 +58,16 @@ export const LongLabel = {
     label: 'procyon lotor (northern raccoon)',
     confidence: 0.76,
     capturedAt: '2026-03-14T02:17:00',
+  },
+}
+
+export const Favorited = {
+  args: {
+    cropUrl: 'https://placehold.co/300x200',
+    label: 'white-tailed deer',
+    confidence: 0.91,
+    capturedAt: '2026-03-14T02:17:00',
+    isFavorite: true,
+    onFavorite: () => {},
   },
 }

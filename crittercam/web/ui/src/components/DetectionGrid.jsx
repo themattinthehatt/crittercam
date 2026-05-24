@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { toggleFavorite } from '../api.js'
+import { toggleFavorite, toggleFavoriteInList } from '../api.js'
 import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
@@ -116,7 +116,7 @@ export default function DetectionGrid() {
   }
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-6 items-start relative">
       <FilterSidebar
         browseMode={browseMode}
         species={speciesList}
@@ -143,6 +143,11 @@ export default function DetectionGrid() {
                   capturedAt={detection.captured_at}
                   selected={selectedId === detection.id}
                   onClick={() => setSelectedId(detection.id)}
+                  isFavorite={detection.favorite === 1}
+                  onFavorite={() => toggleFavoriteInList(
+                    detection,
+                    updater => setResult(prev => ({ ...prev, detections: updater(prev.detections) })),
+                  )}
                 />
               ))}
             </div>
@@ -177,7 +182,16 @@ export default function DetectionGrid() {
           onPrev={handlePrev}
           onNext={handleNext}
           isFavorite={selectedDetection.favorite === 1}
-          onFavorite={() => toggleFavorite(selectedDetection, setSelectedDetection)}
+          onFavorite={() => toggleFavorite(
+            selectedDetection,
+            setSelectedDetection,
+            newValue => setResult(prev => prev && ({
+              ...prev,
+              detections: prev.detections.map(d =>
+                d.id === selectedDetection.id ? { ...d, favorite: newValue } : d
+              ),
+            })),
+          )}
         />
       )}
     </div>

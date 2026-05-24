@@ -127,7 +127,8 @@ def list_detections(
     rows = conn.execute(
         f'''
         SELECT d.id, d.label, d.confidence, d.crop_path,
-               d.individual_id, ind.nickname, i.captured_at
+               d.individual_id, ind.nickname, i.captured_at,
+               i.id AS media_id, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         LEFT JOIN individuals ind ON ind.id = d.individual_id
@@ -150,6 +151,8 @@ def list_detections(
                 'individual_id': row['individual_id'],
                 'nickname': row['nickname'],
                 'captured_at': row['captured_at'],
+                'media_id': row['media_id'],
+                'favorite': row['favorite'],
             }
             for row in rows
         ],
@@ -175,7 +178,8 @@ def recent_by_species() -> list[dict]:
 
     rows = conn.execute(
         '''
-        SELECT d.id, d.label, d.confidence, d.crop_path, i.captured_at
+        SELECT d.id, d.label, d.confidence, d.crop_path,
+               i.captured_at, i.id AS media_id, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
         INNER JOIN (
@@ -200,6 +204,8 @@ def recent_by_species() -> list[dict]:
             'confidence': round(row['confidence'], 3),
             'crop_url': f'/media/{row["crop_path"]}',
             'captured_at': row['captured_at'],
+            'media_id': row['media_id'],
+            'favorite': row['favorite'],
         }
         for row in rows
     ]
