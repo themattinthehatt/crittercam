@@ -8,6 +8,9 @@ export default {
     onClose: () => {},
     onPrev: () => {},
     onNext: () => {},
+    onFavorite: () => {},
+    onDelete: () => {},
+    isFavorite: false,
   },
 }
 
@@ -24,12 +27,23 @@ const BASE = {
   bbox: { x: 0.2, y: 0.25, w: 0.35, h: 0.45 },
 }
 
-// middle of a list — both arrows visible
+// middle of a list — both arrows visible, not favorited
 export const Middle = {
   args: {
     detection: BASE,
     hasPrev: true,
     hasNext: true,
+    isFavorite: false,
+  },
+}
+
+// same but favorited — star should appear solid yellow
+export const Favorited = {
+  args: {
+    detection: BASE,
+    hasPrev: true,
+    hasNext: true,
+    isFavorite: true,
   },
 }
 
