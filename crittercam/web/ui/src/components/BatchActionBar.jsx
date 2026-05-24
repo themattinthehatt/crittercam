@@ -4,7 +4,33 @@ import { TrashIcon, StarIcon, PencilIcon } from './icons.jsx'
 // are batch-selected. It shows a count, a clear button, and action icons.
 // allFavorited drives the star appearance: solid yellow when every selected
 // detection is already favorited (next click will unfavorite), outline otherwise.
-export default function BatchActionBar({ count, allFavorited, onClear, onDelete, onFavorite, onEdit }) {
+// showDeleteConfirm switches the bar into a delete confirmation state.
+export default function BatchActionBar({
+  count, allFavorited,
+  onClear, onDelete, onFavorite, onEdit,
+  showDeleteConfirm = false, onDeleteConfirm, onDeleteCancel,
+}) {
+  if (showDeleteConfirm) {
+    return (
+      <div className="flex items-center justify-between bg-base-200 rounded px-3 py-2 mb-3">
+        <span className="text-sm text-error">
+          Delete {count} observation{count !== 1 ? 's' : ''}?
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-xs btn-ghost border border-base-content/20"
+            onClick={onDeleteCancel}
+          >
+            cancel
+          </button>
+          <button className="btn btn-xs btn-error" onClick={onDeleteConfirm}>
+            delete
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center justify-between bg-base-200 rounded px-3 py-2 mb-3">
       <div className="flex items-center gap-3">

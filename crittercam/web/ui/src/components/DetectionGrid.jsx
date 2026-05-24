@@ -29,6 +29,7 @@ export default function DetectionGrid() {
   // toggle batch membership instead of opening the detail modal.
   const [batchSelectedIds, setBatchSelectedIds] = useState(new Set())
   const batchMode = batchSelectedIds.size > 0
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -72,6 +73,7 @@ export default function DetectionGrid() {
     setResult(null)
     setSelectedId(null)
     setBatchSelectedIds(new Set())
+    setShowBatchDeleteConfirm(false)
 
     const params = new URLSearchParams({ page })
     if (browseMode === 'species' && species) params.append('species', species)
@@ -146,6 +148,21 @@ export default function DetectionGrid() {
     })
   }
 
+  const handleBatchDelete = async () => {
+    // deduplicate media_ids — multiple detections can share one media item
+    const mediaIds = [...new Set(
+      [...batchSelectedIds]
+        .map(id => result.detections.find(d => d.id === id)?.media_id)
+        .filter(Boolean)
+    )]
+    for (const mid of mediaIds) {
+      await deleteMedia(mid)
+    }
+    setBatchSelectedIds(new Set())
+    setShowBatchDeleteConfirm(false)
+    setRefreshKey(k => k + 1)
+  }
+
   const toggleBatch = id => {
     setBatchSelectedIds(prev => {
       const next = new Set(prev)
@@ -192,10 +209,13 @@ export default function DetectionGrid() {
               <BatchActionBar
                 count={batchSelectedIds.size}
                 allFavorited={allFavorited}
-                onClear={() => setBatchSelectedIds(new Set())}
-                onDelete={null}
+                onClear={() => { setBatchSelectedIds(new Set()); setShowBatchDeleteConfirm(false) }}
+                onDelete={() => setShowBatchDeleteConfirm(true)}
                 onFavorite={null}
                 onEdit={null}
+                showDeleteConfirm={showBatchDeleteConfirm}
+                onDeleteConfirm={handleBatchDelete}
+                onDeleteCancel={() => setShowBatchDeleteConfirm(false)}
               />
             )}
             <div className="grid grid-cols-4 gap-3">
