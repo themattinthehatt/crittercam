@@ -55,7 +55,7 @@ export default function FilterSidebar({
         <label className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-wide text-base-content/50">species</span>
           <select
-            className="select select-sm select-bordered w-full"
+            className="select select-sm select-bordered w-full capitalize"
             value={selectedSpecies}
             onChange={e => handleChange('selectedSpecies', e.target.value)}
           >

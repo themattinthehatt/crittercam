@@ -6,7 +6,7 @@ export default function Badge({ label, variant, confidence }) {
     else if (confidence >= 0.4) className += ' badge-warning'
     else className += ' badge-error'
   } else if (variant === 'species') {
-    className += ' badge-primary'
+    className += ' badge-primary capitalize'
   } else if (variant === 'blank') {
     className += ' badge-neutral'
   }
