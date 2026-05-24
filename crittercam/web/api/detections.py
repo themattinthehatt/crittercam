@@ -309,6 +309,70 @@ def get_detection(detection_id: int) -> dict:
     }
 
 
+class DetectionPatch(BaseModel):
+    """Request body for the patch_detection endpoint."""
+
+    species_leaf: str
+    individual_id: int | None
+
+
+@router.patch('/api/detections/{detection_id}')
+def patch_detection(detection_id: int, payload: DetectionPatch) -> dict:
+    """Update the species label and individual assignment on a detection.
+
+    The caller supplies only the leaf species name (e.g. 'vulpes vulpes'); the
+    endpoint resolves the canonical full taxonomy label by looking up an existing
+    detection with that leaf so the stored format stays consistent.
+
+    Args:
+        detection_id: primary key of the detection row
+        payload: species_leaf (leaf name) and individual_id (int or null)
+
+    Returns:
+        updated detection dict in the same shape as GET /api/detections/{id}
+
+    Raises:
+        HTTPException: 404 if the detection does not exist
+        HTTPException: 422 if species_leaf does not match any known label
+    """
+    conn = get_conn()
+
+    row = conn.execute(
+        '''
+        SELECT d.id FROM detections d
+        WHERE d.id = :id AND d.is_active = 1
+        ''',
+        {'id': detection_id},
+    ).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f'detection {detection_id} not found')
+
+    # resolve the full taxonomy label from any existing detection with this leaf
+    label_row = conn.execute(
+        '''
+        SELECT label FROM detections
+        WHERE (label = :leaf OR label LIKE '%;' || :leaf)
+          AND is_active = 1
+        LIMIT 1
+        ''',
+        {'leaf': payload.species_leaf},
+    ).fetchone()
+    if label_row is None:
+        conn.close()
+        raise HTTPException(status_code=422, detail=f'unknown species: {payload.species_leaf}')
+
+    conn.execute(
+        'UPDATE detections SET label = :label, individual_id = :individual_id WHERE id = :id',
+        {'label': label_row['label'], 'individual_id': payload.individual_id, 'id': detection_id},
+    )
+    conn.commit()
+    conn.close()
+
+    # return the full detection object so the caller can update UI state in one round-trip
+    return get_detection(detection_id)
+
+
 @router.delete('/api/media/{media_id}')
 def delete_media(media_id: int) -> dict:
     """Delete a media item and all its associated detections and processing jobs.
