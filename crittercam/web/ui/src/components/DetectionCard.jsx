@@ -18,33 +18,38 @@ export default function DetectionCard({ cropUrl, label, confidence, capturedAt, 
   const timestamp = formatTimestamp(capturedAt)
 
   return (
-    // The card is a flex column: image-container on top, timestamp below.
-    // onClick is passed straight through to the wrapping div so the whole
-    // card is clickable, just like a grid cell in DetectionGrid.
-    <div className="flex flex-col gap-1.5 cursor-pointer" onClick={onClick}>
-      {/* position: relative on the container lets the badge overlays use
-          position: absolute to anchor themselves to its corners. */}
-      <div className={`relative rounded overflow-hidden ${selected ? 'ring-2 ring-base-content/50' : ''}`}>
+    // bg-base-200 makes the card slightly darker than the page background.
+    // overflow-hidden clips the image to the card's rounded corners.
+    // onClick is passed straight through so the whole card is clickable.
+    <div
+      className={`bg-base-200 rounded overflow-hidden cursor-pointer ${selected ? 'ring-2 ring-base-content/50' : ''}`}
+      onClick={onClick}
+    >
+      {/* pt-1 exposes a thin sliver of the card background above the image,
+          visually anchoring the image inside the card. */}
+      <div className="pt-1 px-1">
         {cropUrl
           ? <img className="w-full aspect-[3/2] object-contain block bg-base-300 hover:opacity-90 transition-opacity duration-100" src={cropUrl} alt={label} />
-          : <div className="w-full aspect-[3/2] bg-base-200" />
+          : <div className="w-full aspect-[3/2] bg-base-300" />
         }
-        <span className="absolute top-1.5 left-1.5">
+      </div>
+
+      {/* info section: badges on one row, date on the next */}
+      <div className="px-2 pt-1.5 pb-2">
+        <div className="flex items-center justify-between gap-1">
           <Badge label={label} variant={isBlank ? 'blank' : 'species'} />
-        </span>
-        {!isBlank && (
-          <span className="absolute top-1.5 right-1.5">
+          {!isBlank && (
             <Badge
               label={`${Math.round(confidence * 100)}%`}
               variant="confidence"
               confidence={confidence}
             />
-          </span>
+          )}
+        </div>
+        {timestamp && (
+          <span className="text-xs text-base-content/40 mt-1 block">{timestamp}</span>
         )}
       </div>
-      {timestamp && (
-        <span className="text-xs text-base-content/40 px-0.5">{timestamp}</span>
-      )}
     </div>
   )
 }

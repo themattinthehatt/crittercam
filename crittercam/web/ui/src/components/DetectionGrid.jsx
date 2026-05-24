@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import DetailPanel from './DetailPanel.jsx'
+import DetectionModal from './DetectionModal.jsx'
 import FilterSidebar from './FilterSidebar.jsx'
 import DetectionCard from './DetectionCard.jsx'
 import Button from './Button.jsx'
@@ -9,9 +9,13 @@ export default function DetectionGrid() {
   const [result, setResult] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   // selectedDetection holds the full object for whichever grid cell is open.
-  // DetailPanel is now presentational — it receives this object directly
+  // DetectionModal is presentational — it receives this object directly
   // rather than fetching by ID itself.
   const [selectedDetection, setSelectedDetection] = useState(null)
+
+  // when navigating across a page boundary, records which end of the
+  // incoming page to auto-select once the fetch completes ('first' | 'last').
+  const [pendingSelect, setPendingSelect] = useState(null)
 
   // browse mode: 'species' | 'individual'
   const [browseMode, setBrowseMode] = useState('species')
@@ -61,6 +65,41 @@ export default function DetectionGrid() {
       .then(data => setResult(data))
   }, [page, browseMode, species, individual, dateFrom, dateTo])
 
+  // after a cross-page navigation, auto-select the first or last detection
+  // once the new page's result arrives.
+  useEffect(() => {
+    if (result === null || pendingSelect === null) return
+    const det = pendingSelect === 'first'
+      ? result.detections[0]
+      : result.detections[result.detections.length - 1]
+    if (det) setSelectedId(det.id)
+    setPendingSelect(null)
+  }, [result, pendingSelect])
+
+  // navigation within the modal — handles both within-page and cross-page moves.
+  const idx = result ? result.detections.findIndex(d => d.id === selectedId) : -1
+  const totalPages = result ? Math.ceil(result.total / result.page_size) : 0
+  const hasPrev = idx > 0 || page > 1
+  const hasNext = result !== null && (idx < result.detections.length - 1 || page < totalPages)
+
+  const handlePrev = () => {
+    if (idx > 0) {
+      setSelectedId(result.detections[idx - 1].id)
+    } else {
+      setPendingSelect('last')
+      setPage(p => p - 1)
+    }
+  }
+
+  const handleNext = () => {
+    if (idx < result.detections.length - 1) {
+      setSelectedId(result.detections[idx + 1].id)
+    } else {
+      setPendingSelect('first')
+      setPage(p => p + 1)
+    }
+  }
+
   // changing any filter resets to page 1 — if you're on page 3 of unfiltered
   // results, page 3 may not exist in the filtered set.
   // wrapping each setter ensures the page reset and filter change happen together.
@@ -76,7 +115,7 @@ export default function DetectionGrid() {
   }
 
   return (
-    <div className="flex gap-6 items-start relative">
+    <div className="flex gap-6 items-start">
       <FilterSidebar
         browseMode={browseMode}
         species={speciesList}
@@ -129,9 +168,13 @@ export default function DetectionGrid() {
       </div>
 
       {selectedDetection !== null && (
-        <DetailPanel
+        <DetectionModal
           detection={selectedDetection}
           onClose={() => setSelectedId(null)}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          onPrev={handlePrev}
+          onNext={handleNext}
         />
       )}
     </div>
