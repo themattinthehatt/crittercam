@@ -25,11 +25,11 @@ The `-e` flag installs in editable mode so code changes take effect immediately 
 pytest
 ```
 
-### 4. Install Node.js (for the web dashboard and Storybook)
+### 4. Install Node.js and npm (for the web dashboard and Storybook)
 
-Node.js v22+ is required. Tailwind CSS's native binary (`@tailwindcss/oxide`) must be compiled with the same Node version used to run the app — mismatches cause startup failures.
+Node.js v22+ (and npm, which is bundled with it) are required. npm is used both to build the frontend for production (`crittercam build-ui`) and during development. Tailwind CSS's native binary (`@tailwindcss/oxide`) must be compiled with the same Node version used to run the app — mismatches cause startup failures.
 
-Install via [nvm](https://github.com/nvm-sh/nvm):
+Install via [nvm](https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating) (recommended), or download directly from [nodejs.org](https://nodejs.org/en/download):
 
 ```bash
 nvm install 22
@@ -117,10 +117,18 @@ Component files and their story files live together in `crittercam/web/ui/src/co
 
 ### 4. Run frontend tests
 
-Interactive components have `play` functions in their story files that verify callback behaviour (clicks fire the right handlers, `stopPropagation` holds, confirmation dialogs appear and dismiss correctly). Run them headlessly from the repo root:
+Interactive components have `play` functions in their story files that verify callback behaviour (clicks fire the right handlers, `stopPropagation` holds, confirmation dialogs appear and dismiss correctly).
+
+First, install the Playwright browser (one-time, also required for Storybook):
 
 ```bash
-conda run -n critter npx --prefix crittercam/web/ui vitest run
+npx --prefix crittercam/web/ui playwright install chromium --with-deps
+```
+
+Then run the tests headlessly from the repo root:
+
+```bash
+conda run -n critter npm --prefix crittercam/web/ui run test
 ```
 
 This launches a headless Chromium browser via Playwright, renders each story, executes any `play` function, and reports pass/fail — no running API server required. A clean run currently takes around 5 seconds.
