@@ -20,6 +20,7 @@ crittercam = "crittercam.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
+    "honcho",
     "pre-commit",
     "pytest",
     "ruff",

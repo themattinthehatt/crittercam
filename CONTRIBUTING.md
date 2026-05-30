@@ -4,9 +4,11 @@
 
 ### 1. Create a conda environment
 
+The environment must be named `critter` — Honcho's `Procfile.dev` references this name directly when starting the dev server.
+
 ```bash
-conda create -n crittercam python=3.12
-conda activate crittercam
+conda create -n critter python=3.12
+conda activate critter
 ```
 
 ### 2. Install the package
@@ -69,21 +71,7 @@ This downloads all frontend packages into `crittercam/web/ui/node_modules/`. Onl
 
 ## Dev environment setup
 
-Storybook requires Node.js v22+. If you installed an older version above, upgrade before proceeding:
-
-```bash
-nvm install 22 && nvm use 22
-```
-
-### 1. Install honcho (dev process manager)
-
-```bash
-pip install honcho
-```
-
-Honcho reads `Procfile.dev` and starts the API server and Vite dev server together with one command.
-
-### 2. Run the dev server
+### 1. Run the dev server
 
 ```bash
 honcho start -f Procfile.dev
@@ -95,7 +83,7 @@ This starts two processes simultaneously:
 
 Vite automatically forwards `/api/*` and `/media/*` requests to the FastAPI server, so the browser only needs to know about port 5173.
 
-### 3. Run Storybook
+### 2. Run Storybook
 
 Storybook is a tool for building and reviewing UI components in isolation — no running API server or populated database required.
 
@@ -115,7 +103,7 @@ Then open `http://localhost:6006` in the browser. The main dashboard and Storybo
 
 Component files and their story files live together in `crittercam/web/ui/src/components/`. See `design/STORYBOOK.md` for the component inventory and development workflow.
 
-### 4. Run frontend tests
+### 3. Run frontend tests
 
 Interactive components have `play` functions in their story files that verify callback behaviour (clicks fire the right handlers, `stopPropagation` holds, confirmation dialogs appear and dismiss correctly).
 
