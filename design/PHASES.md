@@ -1,7 +1,7 @@
 # Project Phases — Status Tracker
 
 ## Phase 1 — Ingestion pipeline
-**Status**: Complete
+**Status**: Complete (image support); Video support in progress
 
 ### Scope
 - Accept a source directory (manually pointed at offloaded SD card contents)
@@ -21,6 +21,13 @@
 
 ### Open questions
 - [ ] How to detect SD card mount reliably on this OS?
+- [ ] Camera make/model extraction from mp4 container metadata (deferred; review actual field files first)
+
+### Video support (in progress — see VIDEO.md)
+- [ ] Migration `0003_video_schema.sql` — add `thumb_frame_idx`, `duration_s` to `media`
+- [ ] `crittercam/pipeline/video.py` — frame extraction, uniform sampling, metadata, first-frame hashing
+- [ ] `crittercam/pipeline/ingest.py` — find mp4/avi files; video hashing, metadata, thumbnail
+- [ ] `tests/pipeline/test_video.py` + video ingest tests in `test_ingest.py`
 
 ### Done
 - [x] `crittercam setup` — prompts for data_root, writes config, initialises database
@@ -41,7 +48,7 @@
 ---
 
 ## Phase 2 — Processing & species ID
-**Status**: Complete
+**Status**: Complete (image support); Video support in progress
 
 ### Scope
 - Batch worker reads pending detection jobs from `processing_jobs`
@@ -69,6 +76,12 @@
 - [x] `crittercam setup` updated to prompt for country and admin1_region
 - [x] Country validation against full ISO 3166-1 alpha-3 code list
 - [x] Detection crop generation with configurable padding (`derived/YYYY/MM/DD/<stem>_det001.jpg`); path recorded in `detections.crop_path`
+
+### Video support (in progress — see VIDEO.md)
+- [ ] `_select_winning_detection()` voting helper in `classify.py`
+- [ ] `_classify_video()` — uniform frame sampling, per-frame classification, crop + thumbnail update
+- [ ] `--video-frames` flag on `crittercam classify` (default 5)
+- [ ] Video classify tests in `tests/pipeline/test_classify.py`
 
 ### Completion criteria
 - [x] Pending detection jobs → species label + confidence score in `detections`
@@ -109,7 +122,7 @@
 ---
 
 ## Phase 4 — Review & query interface
-**Status**: Phase 4a complete
+**Status**: Phase 4a complete; Video UI support in progress
 
 ### Scope
 - Local web dashboard served by FastAPI + Uvicorn (Python backend) and React + Vite
@@ -208,6 +221,11 @@
 - Migration: `0002_reid_schema.sql`
 - Similarity threshold: 0.5 (calibrated against domestic cat verification results;
   Decision 025)
+
+### Video UI support (in progress — see VIDEO.md)
+- [ ] `GET /api/detections/{id}`: add `media_type`, `thumb_url`; rename `image_url` → `media_url`
+- [ ] `DetectionModal.jsx`: left panel shows `<video>` for video media; right panel uses `thumb_url`
+- [ ] `DetectionModal.stories.jsx`: update renamed field + add `VideoDetection` story
 
 ### Open questions
 - [ ] Dashboard UI for confirming/correcting/splitting individual assignments

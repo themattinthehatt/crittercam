@@ -904,5 +904,74 @@ config file, and is straightforward to extend.
   `right-[calc(100%+1.5rem)]`) rather than new CSS rules
 - Adding a new DaisyUI theme is a one-line change in `App.css`
 
+## 029 — Video support: ingestion, classification, and UI design
+
+**Date**: 2026-05-30
+**Decision**: Extend the pipeline to support mp4 and avi video files alongside existing
+JPEG images, using uniform frame sampling and plurality voting for classification.
+
+**Ingestion**:
+- Video files are discovered alongside JPEGs by `crittercam ingest`; `media.media_type`
+  distinguishes them (`'image'` | `'video'`)
+- Deduplication hash for video: SHA-256 of the first frame extracted as JPEG bytes, not
+  the raw video file. Rationale: hashing a full video is expensive; the first frame is a
+  stable, unique identifier for camera-trap clips which always start from a unique moment.
+  Edge case (two videos with identical first frames) is acceptable at this deployment scale.
+- Timestamp: mtime fallback only for video. Browning camera mp4 files do not reliably
+  embed timestamps in accessible container metadata; camera make/model extraction is
+  deferred pending review of actual field files (see Open questions in Phase 1).
+- Thumbnail at ingest: first frame (index 0), same 320px max-size JPEG as images.
+  Updated to the representative frame after classification (see Classification below).
+- Two new columns added via migration 0003: `thumb_frame_idx INTEGER NOT NULL DEFAULT 0`
+  (which frame the thumbnail was extracted from; 0 for all images) and `duration_s REAL`
+  (NULL for images).
+
+**Classification — frame sampling**:
+- N frames sampled uniformly; default N=5, configurable via `--video-frames` on
+  `crittercam classify`; N can be any positive integer
+- Sampling formula: `round(i * (frame_count - 1) / (N - 1))` for i in 0..N-1, always
+  including first and last frame. If `frame_count <= N`, classify every frame. If N=1,
+  always take frame 0. This is fully reproducible given model provenance in `detections`.
+- Frames are extracted to a `tempfile.TemporaryDirectory()`; only the crop from the
+  winning frame is written to `derived/` permanently.
+
+**Classification — voting**:
+- If all frames return blank → blank wins (highest-confidence blank detection returned)
+- Otherwise: blank frames are ignored entirely; the non-blank label with the highest vote
+  count (plurality) wins. Rationale: a single animal in one frame should never be outvoted
+  by empty background — camera-trap clips are often mostly background with brief wildlife
+  presence.
+- Tie on vote count → broken by highest sum of confidences across frames for the tied labels
+- Representative frame: the frame for the winning label with the highest individual confidence.
+  Its bbox, confidence, and crop populate the `detections` row.
+
+**Thumbnail update at classify time**:
+- After classification, the thumbnail at `derived/YYYY/MM/DD/<stem>_thumb.jpg` is overwritten
+  with the representative frame (resized to max 320px); `media.thumb_frame_idx` is updated.
+- The path in the DB does not change — only the file content and the frame index column.
+- This makes the thumbnail the most recognisable frame (highest model confidence), used in
+  both the detection grid and the detail panel's right-side bbox overlay.
+
+**Re-identification**: not applied to video detections for now. The embedding step is skipped;
+`embedding_path` remains NULL. Revisit once video data is available and embedding quality from
+extracted frames can be assessed.
+
+**Library**: OpenCV (`cv2`) for all video I/O (frame extraction, metadata, VideoWriter for tests).
+Available as a transitive dependency of SpeciesNet; added explicitly as `opencv-python-headless`
+in `pyproject.toml` if absent.
+
+**UI**:
+- Detection grid and RecentBySpecies are unchanged — both display the crop (a JPEG from the
+  representative frame), identical to images.
+- `DetectionModal` left panel: video → `<video controls>` element with the original file URL;
+  image → existing crop `<img>` (unchanged).
+- `DetectionModal` right panel: video → thumbnail image with SVG bbox overlay (the bbox was
+  computed from this frame, so normalized coords are correct); image → full image with SVG bbox
+  overlay (unchanged).
+- `GET /api/detections/{id}` gains `media_type`, `thumb_url`; `image_url` renamed to `media_url`
+  (points to the original file for both images and videos).
+- HTTP range requests (required by `<video>` for seeking): Starlette 1.2.0's `FileResponse`
+  supports range requests natively; the existing `/media/{path}` route requires no changes.
+
 <!-- Add new decisions below this line, incrementing the number -->
 

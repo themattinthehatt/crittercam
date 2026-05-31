@@ -40,19 +40,27 @@ The system has a clean physical boundary:
 
 ### Phase 1 — Ingestion
 - Triggered manually when SD card is offloaded (approximately monthly)
-- Associates images with a deployment (camera + location); user selects from a list or creates one interactively; camera make/model pre-filled from EXIF
+- Associates media with a deployment (camera + location); user selects from a list or creates one interactively; camera make/model pre-filled from EXIF
+- Supports both JPEG images (`.jpg`, `.jpeg`) and video files (`.mp4`, `.avi`)
 - Copies new files into organized raw store: `media/YYYY/MM/DD/`
-- Extracts EXIF metadata (timestamp, camera settings) at ingest time
-- Generates full-image thumbnails, written to `derived/YYYY/MM/DD/`, mirroring the image archive
-- Idempotent: running ingestion twice on the same card does not duplicate images
-- Enqueues all new images for Phase 2 processing as a batch
+- Extracts EXIF metadata (timestamp, camera settings) at ingest time for images; uses mtime fallback for videos
+- Generates full-image thumbnails (max 320px), written to `derived/YYYY/MM/DD/`, mirroring the archive; for video, the thumbnail is the first frame
+- Idempotent: running ingestion twice on the same card does not duplicate media
+- Deduplication key: SHA-256 of raw file bytes for images; SHA-256 of the first frame (extracted as JPEG) for video (see Decision 029)
+- Enqueues all new media for Phase 2 processing as a batch
 
 ### Phase 2 — Processing
-- Batch job works through the queue of newly ingested images
+- Batch job works through the queue of newly ingested media
 - AI classifier produces: species label, confidence score, bounding box
 - Classifier is a swappable component (see Decisions log)
+- For images: classifier runs on the full image (existing behaviour)
+- For video media: N frames are sampled at uniform intervals and the classifier runs on
+  each; a voting rule selects the winning label (see Decision 029); the highest-confidence
+  frame for the winning label is the representative frame — its bbox and confidence populate
+  the detection row, and the thumbnail is updated from first-frame to representative-frame
 - Generates detection crops immediately after classification:
-  - Padded crop centred on each detected animal's bounding box
+  - Padded crop centred on each detected animal's bounding box; for video, the crop comes
+    from the representative frame
 - Metadata writer commits all results to database in a single transaction
 
 ### Phase 3 — Storage
@@ -98,6 +106,7 @@ The system has a clean physical boundary:
 | Frontend framework | React + Vite | Decided |
 | Chart library | Recharts | Decided |
 | Re-ID model | MegaDescriptor-L-384 (`timm`) | Decided |
+| Video I/O | OpenCV (`opencv-python-headless`) | Decided |
 
 ## Storage Layout
 
@@ -143,11 +152,13 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │   │   ├── exif.py                  # EXIF extraction (Browning camera support)
 │   │   ├── ingest.py                # Phase 1 ingestion + thumbnail generation
 │   │   ├── classify.py              # Phase 2 classification + crop generation
+│   │   ├── video.py                 # video utilities: frame extraction, uniform sampling, metadata
 │   │   ├── identify.py              # Phase 5 re-identification (embed + match)
 │   │   ├── clean.py                 # detection/image removal (clean-db command)
 │   │   └── migrations/
 │   │       ├── 0001_initial_schema.sql
-│   │       └── 0002_reid_schema.sql # individuals table + reid columns on detections
+│   │       ├── 0002_reid_schema.sql # individuals table + reid columns on detections
+│   │       └── 0003_video_schema.sql # thumb_frame_idx + duration_s on media
 │   ├── classifier/
 │   │   ├── base.py                  # Detection dataclass + Classifier Protocol
 │   │   └── speciesnet.py            # SpeciesNet adapter (google/cameratrapai)
@@ -246,10 +257,12 @@ CREATE TABLE media (
     width         INTEGER,                   -- pixels
     height        INTEGER,                   -- pixels
     ingested_at   TEXT    NOT NULL,
-    file_hash     TEXT    NOT NULL UNIQUE,   -- SHA-256, used for deduplication
-    file_size     INTEGER NOT NULL,
-    temperature_c REAL,                      -- ambient temp from EXIF UserComment
-    thumb_path    TEXT                       -- relative to data_root
+    file_hash       TEXT    NOT NULL UNIQUE,   -- SHA-256, used for deduplication
+    file_size       INTEGER NOT NULL,
+    temperature_c   REAL,                      -- ambient temp from EXIF UserComment
+    thumb_path      TEXT,                      -- relative to data_root
+    thumb_frame_idx INTEGER NOT NULL DEFAULT 0, -- frame index the thumbnail was extracted from; always 0 for images; updated to representative frame after video classification
+    duration_s      REAL                       -- video duration in seconds; NULL for images
 );
 ```
 
