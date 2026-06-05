@@ -239,7 +239,7 @@ One row per file. No processing state — that lives in `processing_jobs`.
 CREATE TABLE media (
     id            INTEGER PRIMARY KEY,
     deployment_id INTEGER REFERENCES deployments(id),
-    captured_at   TEXT,                      -- EXIF DateTimeOriginal, ISO 8601, nullable
+    captured_at   TEXT,                      -- capture timestamp, ISO 8601, nullable; from EXIF DateTimeOriginal or filename pattern
     path          TEXT    NOT NULL UNIQUE,   -- relative to data_root
     filename      TEXT    NOT NULL,
     media_type    TEXT    NOT NULL DEFAULT 'image',  -- 'image' | 'video' | 'audio'

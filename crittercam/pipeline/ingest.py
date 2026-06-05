@@ -81,10 +81,14 @@ def ingest(
         metadata = read_exif(path)
         captured_at = metadata.captured_at
         if not captured_at:
+            captured_at = _file_mtime(path)
+        if not captured_at:
             captured_at = parse_datetime_from_filename(path)
             if captured_at:
                 logger.info(f'recovered timestamp from filename for {path.name}')
-        date = _capture_date(captured_at, path)
+            else:
+                logger.warning(f'no timestamp available for {path.name}')
+        date = captured_at or datetime.now()
         dest_rel = Path('media') / f'{date.year:04d}' / f'{date.month:02d}' / f'{date.day:02d}' / path.name
         dest_abs = data_root / dest_rel
 
@@ -188,6 +192,21 @@ def _hash_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _file_mtime(path: Path) -> datetime | None:
+    """Return the file modification time as a datetime, or None on failure.
+
+    Args:
+        path: file to stat
+
+    Returns:
+        naive datetime from mtime, or None if stat raises
+    """
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime)
+    except OSError:
+        return None
+
+
 def _load_existing_hashes(conn: sqlite3.Connection) -> set[str]:
     """Load all file hashes currently in the images table.
 
@@ -227,21 +246,3 @@ def _generate_thumbnail(image_abs: Path, image_rel: Path, data_root: Path) -> Pa
     except Exception as exc:
         logger.warning(f'thumbnail generation failed for {image_abs.name}: {exc}')
         return None
-
-
-def _capture_date(captured_at: datetime | None, path: Path) -> datetime:
-    """Return the capture date for path organisation.
-
-    Uses captured_at if available, falling back to file mtime.
-
-    Args:
-        captured_at: resolved capture datetime (from EXIF or filename), or None
-        path: path to the image file (used for mtime fallback)
-
-    Returns:
-        datetime to use for YYYY/MM/DD directory placement
-    """
-    if captured_at:
-        return captured_at
-    logger.warning(f'no timestamp for {path.name}, falling back to file mtime')
-    return datetime.fromtimestamp(path.stat().st_mtime)
