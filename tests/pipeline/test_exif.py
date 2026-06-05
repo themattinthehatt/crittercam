@@ -1,9 +1,9 @@
 """Tests for crittercam.pipeline.exif."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from crittercam.pipeline.exif import ImageMetadata, read_exif
+from crittercam.pipeline.exif import ImageMetadata, parse_datetime_from_filename, read_exif
 
 BROWNING_IMAGE = Path(__file__).parent / 'assets' / 'BROWNING.JPG'
 
@@ -77,6 +77,58 @@ class TestReadExifMissingFile:
             camera_model=None,
             temperature_c=None,
         )
+
+
+class TestParseDatetimeFromFilename:
+    """Test parse_datetime_from_filename."""
+
+    def test_iso_hyphen_negative_offset(self, tmp_path):
+        # Arrange
+        path = tmp_path / '2026-06-04T09-28-37-04-00.thumbnail.jpg'
+
+        # Act
+        result = parse_datetime_from_filename(path)
+
+        # Assert
+        expected = datetime(2026, 6, 4, 9, 28, 37, tzinfo=timezone(timedelta(hours=-4)))
+        assert result == expected
+
+    def test_iso_hyphen_positive_offset(self, tmp_path):
+        # Arrange
+        path = tmp_path / '2026-06-04T09-28-37+05-30.jpg'
+
+        # Act
+        result = parse_datetime_from_filename(path)
+
+        # Assert
+        expected = datetime(
+            2026, 6, 4, 9, 28, 37,
+            tzinfo=timezone(timedelta(hours=5, minutes=30)),
+        )
+        assert result == expected
+
+    def test_iso_hyphen_utc_offset(self, tmp_path):
+        # Arrange
+        path = tmp_path / '2026-01-15T12-00-00+00-00.jpg'
+
+        # Act
+        result = parse_datetime_from_filename(path)
+
+        # Assert
+        assert result == datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+    def test_no_match_returns_none(self, tmp_path):
+        # Arrange
+        path = tmp_path / 'IMG_0042.jpg'
+
+        # Act / Assert
+        assert parse_datetime_from_filename(path) is None
+
+    def test_returns_timezone_aware_datetime(self, tmp_path):
+        path = tmp_path / '2026-06-04T09-28-37-04-00.jpg'
+        result = parse_datetime_from_filename(path)
+        assert result is not None
+        assert result.tzinfo is not None
 
 
 class TestParseTemperature:

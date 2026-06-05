@@ -3,7 +3,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from PIL import Image
@@ -24,6 +24,13 @@ _TAG_MODEL = _TAG_IDS['Model']
 _TAG_USER_COMMENT = _TAG_IDS['UserComment']
 
 _EXIF_DATETIME_FORMAT = '%Y:%m:%d %H:%M:%S'
+
+# ISO 8601 with colons replaced by hyphens, as produced by some camera firmware.
+# Matches: YYYY-MM-DDTHH-MM-SS±HH-MM
+# Example: 2026-06-04T09-28-37-04-00.thumbnail.jpg
+_FILENAME_ISO_HYPHEN_RE = re.compile(
+    r'(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})([+-]\d{2})-(\d{2})'
+)
 
 
 @dataclass
@@ -126,6 +133,59 @@ def _parse_temperature(user_comment: bytes | str | None) -> float | None:
     if match:
         return float(match.group(1))
     return None
+
+
+def parse_datetime_from_filename(path: Path) -> datetime | None:
+    """Try to parse a capture datetime from known filename patterns.
+
+    Attempts each known pattern in order and returns the first match.
+    Useful as a fallback when EXIF data is absent.
+
+    Args:
+        path: path to the image file
+
+    Returns:
+        timezone-aware datetime if the filename encodes an offset, naive datetime
+        otherwise, or None if no known pattern matches
+    """
+    name = path.name
+    for parser in (_parse_iso_hyphen,):
+        result = parser(name)
+        if result is not None:
+            return result
+    return None
+
+
+def _parse_iso_hyphen(name: str) -> datetime | None:
+    """Parse ISO 8601 datetime with hyphens substituted for colons.
+
+    Handles filenames of the form YYYY-MM-DDTHH-MM-SS±HH-MM, produced by
+    camera firmware that cannot use colons in filenames.
+
+    Args:
+        name: filename string to search
+
+    Returns:
+        timezone-aware datetime, or None if pattern not found or value invalid
+    """
+    match = _FILENAME_ISO_HYPHEN_RE.search(name)
+    if not match:
+        return None
+    year, month, day, hour, minute, second, tz_hh, tz_mm = match.groups()
+    try:
+        tz_sign = 1 if tz_hh.startswith('+') else -1
+        offset = timedelta(
+            hours=tz_sign * int(tz_hh[1:]),
+            minutes=tz_sign * int(tz_mm),
+        )
+        return datetime(
+            int(year), int(month), int(day),
+            int(hour), int(minute), int(second),
+            tzinfo=timezone(offset),
+        )
+    except ValueError:
+        logger.warning(f'unparseable filename datetime: {name!r}')
+        return None
 
 
 def _clean_str(value: str | None) -> str | None:

@@ -188,6 +188,24 @@ class TestIngest:
         assert summary.skipped == 1
         assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 1
 
+    def test_filename_timestamp_used_when_no_exif(self, tmp_path, db, make_jpeg):
+        # Arrange — filename encodes 2026-06-04T09:28:37-04:00
+        source = tmp_path / 'source'
+        data_root = tmp_path / 'data'
+        make_jpeg(source / '2026-06-04T09-28-37-04-00.thumbnail.jpg')
+
+        # Act
+        with patch('crittercam.pipeline.ingest.read_exif', return_value=_NO_TIMESTAMP_METADATA):
+            summary = ingest(source, data_root, db)
+
+        # Assert — placed under the date from the filename, captured_at stored
+        assert summary.ingested == 1
+        expected_dest = data_root / 'media' / '2026' / '06' / '04' / '2026-06-04T09-28-37-04-00.thumbnail.jpg'
+        assert expected_dest.exists()
+        row = db.execute('SELECT captured_at FROM media').fetchone()
+        assert row['captured_at'] is not None
+        assert '2026-06-04' in row['captured_at']
+
     def test_mtime_fallback_when_no_exif_timestamp(self, tmp_path, db, make_jpeg):
         # Arrange
         source = tmp_path / 'source'
