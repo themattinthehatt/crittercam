@@ -1,3 +1,4 @@
+import { expect, fn, userEvent, within } from 'storybook/test'
 import FilterSidebar from './FilterSidebar'
 
 export default {
@@ -71,4 +72,59 @@ export const DeploymentSelected = {
 
 export const WithDateRange = {
   args: { ...BASE, browseMode: 'species', dateFrom: '2026-03-01', dateTo: '2026-03-31' },
+}
+
+// ---------------------------------------------------------------------------
+// Interaction tests
+// ---------------------------------------------------------------------------
+
+// Selecting a deployment calls onChange with the chosen deployment id.
+export const DeploymentSelectionCallsOnChange = {
+  args: { ...BASE, browseMode: 'species', onChange: fn() },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.selectOptions(
+      canvas.getByRole('combobox', { name: 'deployment' }),
+      '1',
+    )
+    await expect(args.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ selectedDeployment: '1' }),
+    )
+  },
+}
+
+// Switching browse mode must preserve the active deployment in the onChange payload.
+export const BrowseModeChangePreservesDeployment = {
+  args: { ...BASE, browseMode: 'species', selectedDeployment: '1', onChange: fn() },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.selectOptions(
+      canvas.getByRole('combobox', { name: 'browse by' }),
+      'individual',
+    )
+    await expect(args.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ browseMode: 'individual', selectedDeployment: '1' }),
+    )
+  },
+}
+
+// Clear button resets selectedDeployment along with all other filters.
+export const ClearResetsDeployment = {
+  args: { ...BASE, browseMode: 'species', selectedDeployment: '1', onChange: fn() },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /clear filters/i }))
+    await expect(args.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ selectedDeployment: '' }),
+    )
+  },
+}
+
+// Clear button must appear whenever only selectedDeployment is set (hasFilters logic).
+export const ClearVisibleWithDeploymentOnly = {
+  args: { ...BASE, browseMode: 'favorited', selectedDeployment: '2', onChange: fn() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole('button', { name: /clear filters/i })).toBeTruthy()
+  },
 }
