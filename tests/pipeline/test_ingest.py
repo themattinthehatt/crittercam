@@ -1,5 +1,6 @@
 """Tests for crittercam.pipeline.ingest."""
 
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -187,6 +188,42 @@ class TestIngest:
         assert summary.ingested == 0
         assert summary.skipped == 1
         assert db.execute('SELECT COUNT(*) FROM media').fetchone()[0] == 1
+
+    def test_mtime_used_before_filename_when_no_exif(self, tmp_path, db, make_jpeg):
+        # Arrange — filename encodes 2024-01-15, mtime set to 2025-03-10; mtime should win
+        source = tmp_path / 'source'
+        data_root = tmp_path / 'data'
+        src_path = source / '2024-01-15T12-00-00+00-00.jpg'
+        make_jpeg(src_path)
+        mtime_target = datetime(2025, 3, 10, 8, 0, 0)
+        os.utime(src_path, (mtime_target.timestamp(), mtime_target.timestamp()))
+
+        # Act
+        with patch('crittercam.pipeline.ingest.read_exif', return_value=_NO_TIMESTAMP_METADATA):
+            ingest(source, data_root, db)
+
+        # Assert — placed under mtime date (2025-03-10), not filename date (2024-01-15)
+        assert (data_root / 'media' / '2025' / '03' / '10' / '2024-01-15T12-00-00+00-00.jpg').exists()
+        row = db.execute('SELECT captured_at FROM media').fetchone()
+        assert '2025-03-10' in row['captured_at']
+
+    def test_filename_used_when_stat_fails(self, tmp_path, db, make_jpeg):
+        # Arrange — mtime unavailable, filename encodes 2026-06-04T09:28:37-04:00
+        source = tmp_path / 'source'
+        data_root = tmp_path / 'data'
+        make_jpeg(source / '2026-06-04T09-28-37-04-00.thumbnail.jpg')
+
+        # Act — _file_mtime patched to return None so filename parsing is the only source
+        with patch('crittercam.pipeline.ingest.read_exif', return_value=_NO_TIMESTAMP_METADATA), \
+             patch('crittercam.pipeline.ingest._file_mtime', return_value=None):
+            summary = ingest(source, data_root, db)
+
+        # Assert — placed under the filename date, captured_at stored
+        assert summary.ingested == 1
+        expected = data_root / 'media' / '2026' / '06' / '04' / '2026-06-04T09-28-37-04-00.thumbnail.jpg'
+        assert expected.exists()
+        row = db.execute('SELECT captured_at FROM media').fetchone()
+        assert '2026-06-04' in row['captured_at']
 
     def test_mtime_fallback_when_no_exif_timestamp(self, tmp_path, db, make_jpeg):
         # Arrange

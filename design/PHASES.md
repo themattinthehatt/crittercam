@@ -27,7 +27,7 @@
 - [x] `crittercam ingest --source PATH [--deployment-id ID]` — finds JPEGs, deduplicates by SHA-256, copies to archive, writes DB rows, enqueues detection jobs; interactive deployment selection when `--deployment-id` is omitted
 - [x] Deployment selection: lists existing deployments; option to create new; camera make/model pre-filled from EXIF of first image in source
 - [x] EXIF extraction — timestamp, dimensions, camera make/model, temperature (Browning UserComment)
-- [x] mtime fallback when EXIF timestamp is absent
+- [x] timestamp recovery from filename when EXIF is absent (ISO-hyphen pattern: `YYYY-MM-DDTHH-MM-SS±HH-MM`); mtime fallback when neither source is available
 - [x] Destination collision detection (different hash, same filename + date → error, not silent overwrite)
 - [x] Idempotency verified — re-running on the same source produces no duplicates
 - [x] Thumbnail generation at ingest time (max 320px, `derived/YYYY/MM/DD/<stem>_thumb.jpg`); path recorded in `media.thumb_path`
