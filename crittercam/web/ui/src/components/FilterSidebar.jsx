@@ -16,24 +16,27 @@ export default function FilterSidebar({
   selectedSpecies,
   individuals,
   selectedIndividual,
+  deployments,
+  selectedDeployment,
   dateFrom,
   dateTo,
   onChange,
 }) {
   const activeFilter = browseMode === 'species' ? selectedSpecies : selectedIndividual
-  const hasFilters = activeFilter || dateFrom || dateTo
+  const hasFilters = activeFilter || selectedDeployment || dateFrom || dateTo
 
   const handleChange = (field, value) => {
-    onChange({ browseMode, selectedSpecies, selectedIndividual, dateFrom, dateTo, [field]: value })
+    onChange({ browseMode, selectedSpecies, selectedIndividual, selectedDeployment, dateFrom, dateTo, [field]: value })
   }
 
-  // switching modes clears both entity filters so stale values don't carry over
+  // switching modes clears both entity filters so stale values don't carry over;
+  // selectedDeployment is preserved since deployment is orthogonal to browse mode.
   const handleModeChange = value => {
-    onChange({ browseMode: value, selectedSpecies: '', selectedIndividual: '', dateFrom, dateTo })
+    onChange({ browseMode: value, selectedSpecies: '', selectedIndividual: '', selectedDeployment, dateFrom, dateTo })
   }
 
   const handleClear = () => {
-    onChange({ browseMode, selectedSpecies: '', selectedIndividual: '', dateFrom: '', dateTo: '' })
+    onChange({ browseMode, selectedSpecies: '', selectedIndividual: '', selectedDeployment: '', dateFrom: '', dateTo: '' })
   }
 
   return (
@@ -82,6 +85,22 @@ export default function FilterSidebar({
           </select>
         </label>
       ))}
+
+      <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-base-content/50">deployment</span>
+        <select
+          className="select select-sm select-bordered w-full"
+          value={selectedDeployment}
+          onChange={e => handleChange('selectedDeployment', e.target.value)}
+        >
+          <option value="">all</option>
+          {deployments.map(dep => (
+            <option key={dep.id} value={String(dep.id)}>
+              {dep.deployment_name || `#${dep.id}`}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-xs uppercase tracking-wide text-base-content/50">from</span>

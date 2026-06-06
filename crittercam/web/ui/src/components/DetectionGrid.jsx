@@ -39,12 +39,14 @@ export default function DetectionGrid() {
   // filter state — empty string means "no filter applied"
   const [species, setSpecies] = useState('')
   const [individual, setIndividual] = useState('')
+  const [deployment, setDeployment] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
   // dropdown lists — fetched once on mount
   const [speciesList, setSpeciesList] = useState([])
   const [individualList, setIndividualList] = useState([])
+  const [deploymentList, setDeploymentList] = useState([])
 
   useEffect(() => {
     fetch('/api/species')
@@ -53,6 +55,9 @@ export default function DetectionGrid() {
     fetch('/api/individuals')
       .then(r => r.json())
       .then(data => setIndividualList(data))
+    fetch('/api/deployments')
+      .then(r => r.json())
+      .then(data => setDeploymentList(data))
   }, [])  // [] means run once when the component first mounts, never again
 
   // fetch the full detection object whenever the selected grid cell changes.
@@ -82,13 +87,14 @@ export default function DetectionGrid() {
     if (browseMode === 'species' && species) params.append('species', species)
     if (browseMode === 'individual' && individual) params.append('individual_id', individual)
     if (browseMode === 'favorited') params.append('only_favorites', 'true')
+    if (deployment) params.append('deployment_id', deployment)
     if (dateFrom) params.append('date_from', dateFrom)
     if (dateTo) params.append('date_to', dateTo)
 
     fetch(`/api/detections?${params}`)
       .then(r => r.json())
       .then(data => setResult(data))
-  }, [page, browseMode, species, individual, dateFrom, dateTo, refreshKey])
+  }, [page, browseMode, species, individual, deployment, dateFrom, dateTo, refreshKey])
 
   // after a cross-page navigation, auto-select the first or last detection
   // once the new page's result arrives.
@@ -214,10 +220,11 @@ export default function DetectionGrid() {
       result.detections.find(d => d.id === id)?.favorite === 1
     )
 
-  const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, dateFrom: df, dateTo: dt }) => {
+  const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, selectedDeployment: dep, dateFrom: df, dateTo: dt }) => {
     setBrowseMode(bm)
     setSpecies(sp)
     setIndividual(ind)
+    setDeployment(dep)
     setDateFrom(df)
     setDateTo(dt)
     setPage(1)
@@ -231,6 +238,8 @@ export default function DetectionGrid() {
         selectedSpecies={species}
         individuals={individualList}
         selectedIndividual={individual}
+        deployments={deploymentList}
+        selectedDeployment={deployment}
         dateFrom={dateFrom}
         dateTo={dateTo}
         onChange={handleFilterChange}

@@ -28,75 +28,47 @@ const INDIVIDUALS = [
   { id: 3, nickname: 'Bandit' },
 ]
 
+const DEPLOYMENTS = [
+  { id: 1, deployment_name: 'Backyard feeder' },
+  { id: 2, deployment_name: 'Trail cam east' },
+  { id: 3, deployment_name: null },
+]
+
+const BASE = {
+  species: SPECIES,
+  individuals: INDIVIDUALS,
+  deployments: DEPLOYMENTS,
+  selectedSpecies: '',
+  selectedIndividual: '',
+  selectedDeployment: '',
+  dateFrom: '',
+  dateTo: '',
+}
+
 export const SpeciesMode = {
-  args: {
-    browseMode: 'species',
-    species: SPECIES,
-    selectedSpecies: '',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '',
-    dateFrom: '',
-    dateTo: '',
-  },
+  args: { ...BASE, browseMode: 'species' },
 }
 
 export const SpeciesSelected = {
-  args: {
-    browseMode: 'species',
-    species: SPECIES,
-    selectedSpecies: 'raccoon',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '',
-    dateFrom: '',
-    dateTo: '',
-  },
+  args: { ...BASE, browseMode: 'species', selectedSpecies: 'raccoon' },
 }
 
 export const IndividualMode = {
-  args: {
-    browseMode: 'individual',
-    species: SPECIES,
-    selectedSpecies: '',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '',
-    dateFrom: '',
-    dateTo: '',
-  },
+  args: { ...BASE, browseMode: 'individual' },
 }
 
 export const IndividualSelected = {
-  args: {
-    browseMode: 'individual',
-    species: SPECIES,
-    selectedSpecies: '',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '1',
-    dateFrom: '',
-    dateTo: '',
-  },
+  args: { ...BASE, browseMode: 'individual', selectedIndividual: '1' },
 }
 
 export const FavoritedMode = {
-  args: {
-    browseMode: 'favorited',
-    species: SPECIES,
-    selectedSpecies: '',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '',
-    dateFrom: '',
-    dateTo: '',
-    onChange: () => {},
-  },
+  args: { ...BASE, browseMode: 'favorited', onChange: () => {} },
+}
+
+export const DeploymentSelected = {
+  args: { ...BASE, browseMode: 'species', selectedDeployment: '1' },
 }
 
 export const WithDateRange = {
-  args: {
-    browseMode: 'species',
-    species: SPECIES,
-    selectedSpecies: '',
-    individuals: INDIVIDUALS,
-    selectedIndividual: '',
-    dateFrom: '2026-03-01',
-    dateTo: '2026-03-31',
-  },
+  args: { ...BASE, browseMode: 'species', dateFrom: '2026-03-01', dateTo: '2026-03-31' },
 }
