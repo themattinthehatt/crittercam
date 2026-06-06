@@ -1,0 +1,56 @@
+name: Run Tests
+
+on:
+  # Allow manually running from Github UI or API.
+  workflow_dispatch:
+  push:
+    branches: [main]
+  # to re-run status checks, mark as draft then ready_for_review
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run backend tests
+        run: |
+          pytest
+
+  test-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: crittercam/web/ui
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: crittercam/web/ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run frontend tests
+        working-directory: crittercam/web/ui
+        run: npm test
