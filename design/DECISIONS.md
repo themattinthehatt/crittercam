@@ -585,9 +585,11 @@ crittercam/web/
             components/
                 StatsBar.jsx           # summary statistics
                 RecentBySpecies.jsx    # most recent crop per species (Home tab)
-                DetectionsOverTime.jsx # weekly line chart (Analytics tab)
+                AnalyticsTab.jsx       # Analytics tab — owns filter state, renders charts
+                DetectionsOverTime.jsx # weekly line chart; accepts deployment/date filter props
+                ActivityByHour.jsx     # hourly activity chart; accepts deployment/date filter props
                 DetectionGrid.jsx      # paginated thumbnail grid with filters
-                FilterSidebar.jsx      # mode selector, species/individual/deployment dropdowns, date range
+                FilterSidebar.jsx      # reusable filter sidebar; showBrowseControls=false for analytics
                 DetectionModal.jsx     # crop + full image with SVG bbox overlay
             App.jsx
             App.css
@@ -907,6 +909,35 @@ config file, and is straightforward to extend.
 - Custom one-off CSS values use Tailwind arbitrary-value syntax (e.g.
   `right-[calc(100%+1.5rem)]`) rather than new CSS rules
 - Adding a new DaisyUI theme is a one-line change in `App.css`
+
+## 029 — FilterSidebar reused across Browse and Analytics tabs via showBrowseControls prop
+
+**Date**: 2026-06-05
+**Decision**: `FilterSidebar` is a shared component used by both the Browse tab (full filter set)
+and the Analytics tab (deployment + date range only). A `showBrowseControls` boolean prop
+(default `true`) hides the browse-by and entity dropdowns when `false`. Browse-control props
+(`browseMode`, `species`, `selectedSpecies`, `individuals`, `selectedIndividual`) default to
+empty values so the analytics caller does not need to pass them.
+
+**Considered**:
+- Separate `AnalyticsFilterSidebar` component — no code shared; layout and clear-button logic
+  would diverge over time
+- Boolean flags `showBrowseMode` + `showEntityFilter` — two props instead of one; more granular
+  but unnecessary at current scale
+- Decompose into `BrowseModeField`, `EntityField`, `DeploymentField`, `DateRangeField` and compose
+  per context — most modular, but over-engineering for two configurations
+
+**Rationale**: A single `showBrowseControls` prop covers the only two configurations that exist.
+The shared container, `hasFilters` logic, and clear button stay in one place. If a third filter
+configuration appears, decomposing into field components becomes the natural next step.
+
+**Implications**:
+- `AnalyticsTab` passes only `showBrowseControls={false}`, `deployments`, `selectedDeployment`,
+  `dateFrom`, `dateTo`, and `onChange` — the browse props are omitted entirely
+- `FilterSidebar.onChange` always returns the full state object (including browse fields as empty
+  strings when hidden); `AnalyticsTab` destructures only the three fields it uses
+- The `hasFilters` guard for the clear button accounts for `showBrowseControls` so the button
+  does not appear when only the hidden browse fields have values
 
 <!-- Add new decisions below this line, incrementing the number -->
 

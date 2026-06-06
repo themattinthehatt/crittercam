@@ -65,7 +65,7 @@ The system has a clean physical boundary:
 ### Phase 4 — Interface
 - Local web dashboard served by FastAPI + Uvicorn (Python) with a React (Vite) frontend
 - Three-tab layout: Home (summary statistics), Browse (filterable detection grid),
-  Analytics (charts and visualizations)
+  Analytics (charts and visualizations with deployment/date filter sidebar)
 - Phase 4a (first pass) is read-only; label correction is deferred to Phase 4b
 - In development: Vite dev server and Uvicorn run as separate processes via `Procfile.dev`
 - In production: React app is compiled once by `crittercam build-ui`; `crittercam serve`
@@ -158,16 +158,20 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │       ├── api/                     # FastAPI route modules
 │       │   ├── __init__.py          # shared get_conn() helper
 │       │   ├── detections.py        # GET /api/detections, /api/detections/recent_by_species,
-│       │   │                        #     /api/detections/{id}, /api/species, /api/individuals
-│       │   └── stats.py             # GET /api/stats/summary, /api/stats/detections_over_time
+│       │   │                        #     /api/detections/{id}, /api/species, /api/individuals,
+│       │   │                        #     /api/deployments; all filterable by deployment_id/date
+│       │   └── stats.py             # GET /api/stats/summary, /api/stats/detections_over_time,
+│       │                            #     /api/stats/activity_by_hour; filterable by deployment_id/date
 │       ├── ui/                      # React app (Vite)
 │       │   ├── src/
 │       │   │   ├── components/
 │       │   │   │   ├── StatsBar.jsx           # summary statistics
 │       │   │   │   ├── RecentBySpecies.jsx    # most recent crop per species (Home tab)
-│       │   │   │   ├── DetectionsOverTime.jsx # weekly line chart (Analytics tab)
+│       │   │   │   ├── AnalyticsTab.jsx       # Analytics tab — owns filter state, renders charts
+│       │   │   │   ├── DetectionsOverTime.jsx # weekly line chart; accepts deployment/date filter props
+│       │   │   │   ├── ActivityByHour.jsx     # hourly activity chart; accepts deployment/date filter props
 │       │   │   │   ├── DetectionGrid.jsx      # paginated grid; browse by species, individual, or favorites
-│       │   │   │   ├── FilterSidebar.jsx      # mode selector, species/individual/deployment dropdowns, date range
+│       │   │   │   ├── FilterSidebar.jsx      # reusable filter sidebar; showBrowseControls=false for analytics
 │       │   │   │   └── DetectionModal.jsx     # crop + full image with SVG bbox overlay
 │       │   │   ├── App.jsx
 │       │   │   ├── App.css
