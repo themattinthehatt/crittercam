@@ -11,14 +11,28 @@ Focused on cases that caused real regressions:
 # helpers
 # ---------------------------------------------------------------------------
 
-def _insert_media(db, media_id: int = 1, captured_at: str = '2026-01-01T00:00:00') -> None:
+def _insert_deployment(db, dep_id: int = 1, deployment_name: str | None = 'test deployment') -> None:
+    db.execute(
+        'INSERT INTO deployments (id, deployment_name) VALUES (:id, :name)',
+        {'id': dep_id, 'name': deployment_name},
+    )
+    db.commit()
+
+
+def _insert_media(
+    db,
+    media_id: int = 1,
+    captured_at: str = '2026-01-01T00:00:00',
+    deployment_id: int | None = None,
+) -> None:
     db.execute(
         '''
-        INSERT INTO media (id, path, filename, ingested_at, file_hash, file_size, captured_at)
-        VALUES (:id, :path, :filename, :ingested_at, :file_hash, :file_size, :captured_at)
+        INSERT INTO media (id, deployment_id, path, filename, ingested_at, file_hash, file_size, captured_at)
+        VALUES (:id, :deployment_id, :path, :filename, :ingested_at, :file_hash, :file_size, :captured_at)
         ''',
         {
             'id': media_id,
+            'deployment_id': deployment_id,
             'path': f'media/2026/01/01/img{media_id:04d}.jpg',
             'filename': f'img{media_id:04d}.jpg',
             'ingested_at': '2026-01-01T00:00:00',
@@ -325,6 +339,139 @@ class TestDeleteMedia:
 
         assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 1').fetchone()[0] == 0
         assert db.execute('SELECT COUNT(*) FROM individuals WHERE id = 2').fetchone()[0] == 1
+
+
+# ---------------------------------------------------------------------------
+# GET /api/deployments
+# ---------------------------------------------------------------------------
+
+class TestListDeployments:
+    """Test the list_deployments endpoint."""
+
+    def test_list_deployments_returns_deployment_with_media(self, client, db):
+        _insert_deployment(db)
+        _insert_media(db, deployment_id=1)
+
+        response = client.get('/api/deployments')
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == 1
+        assert data[0]['deployment_name'] == 'test deployment'
+
+    def test_list_deployments_excludes_deployment_without_media(self, client, db):
+        _insert_deployment(db, dep_id=1)
+        _insert_deployment(db, dep_id=2, deployment_name='empty deployment')
+        _insert_media(db, deployment_id=1)
+
+        response = client.get('/api/deployments')
+
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]['id'] == 1
+
+    def test_list_deployments_empty_when_no_deployments(self, client, db):
+        response = client.get('/api/deployments')
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_deployments_null_name_returned(self, client, db):
+        _insert_deployment(db, dep_id=1, deployment_name=None)
+        _insert_media(db, deployment_id=1)
+
+        response = client.get('/api/deployments')
+
+        assert response.json()[0]['deployment_name'] is None
+
+    def test_list_deployments_ordered_by_id(self, client, db):
+        _insert_deployment(db, dep_id=2, deployment_name='second')
+        _insert_deployment(db, dep_id=1, deployment_name='first')
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_media(db, media_id=2, deployment_id=2)
+
+        response = client.get('/api/deployments')
+
+        assert [d['id'] for d in response.json()] == [1, 2]
+
+
+# ---------------------------------------------------------------------------
+# GET /api/detections — deployment_id filter
+# ---------------------------------------------------------------------------
+
+class TestListDetectionsDeploymentFilter:
+    """Test deployment_id filtering on list_detections."""
+
+    def test_deployment_filter_returns_matching_detections(self, client, db):
+        _insert_deployment(db, dep_id=1)
+        _insert_deployment(db, dep_id=2)
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_media(db, media_id=2, deployment_id=2)
+        _insert_detection(db, det_id=1, media_id=1)
+        _insert_detection(db, det_id=2, media_id=2, crop_path='derived/2026/01/01/det0002.jpg')
+
+        response = client.get('/api/detections?deployment_id=1')
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body['total'] == 1
+        assert body['detections'][0]['id'] == 1
+
+    def test_deployment_filter_excludes_other_deployments(self, client, db):
+        _insert_deployment(db, dep_id=1)
+        _insert_deployment(db, dep_id=2)
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_media(db, media_id=2, deployment_id=2)
+        _insert_detection(db, det_id=1, media_id=1)
+        _insert_detection(db, det_id=2, media_id=2, crop_path='derived/2026/01/01/det0002.jpg')
+
+        response = client.get('/api/detections?deployment_id=2')
+
+        body = response.json()
+        assert body['total'] == 1
+        assert body['detections'][0]['id'] == 2
+
+    def test_deployment_filter_no_results_when_no_match(self, client, db):
+        _insert_deployment(db, dep_id=1)
+        _insert_deployment(db, dep_id=2)
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_detection(db, det_id=1, media_id=1)
+
+        response = client.get('/api/detections?deployment_id=2')
+
+        assert response.json()['total'] == 0
+
+    def test_deployment_filter_combined_with_species(self, client, db):
+        """deployment_id and species can be combined — only the intersection is returned."""
+        fox = 'abc;animalia;chordata;mammalia;carnivora;canidae;vulpes;vulpes vulpes'
+        cat = 'xyz;animalia;chordata;mammalia;carnivora;felidae;felis;domestic cat'
+        _insert_deployment(db, dep_id=1)
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_detection(db, det_id=1, media_id=1, label=fox)
+        _insert_detection(db, det_id=2, media_id=1, label=cat, crop_path='derived/2026/01/01/det0002.jpg')
+
+        response = client.get('/api/detections?deployment_id=1&species=vulpes+vulpes')
+
+        body = response.json()
+        assert body['total'] == 1
+        assert body['detections'][0]['label'] == 'vulpes vulpes'
+
+    def test_deployment_filter_combined_with_only_favorites(self, client, db):
+        """deployment_id and only_favorites can be combined."""
+        _insert_deployment(db, dep_id=1)
+        _insert_media(db, media_id=1, deployment_id=1)
+        _insert_media(db, media_id=2, deployment_id=1)
+        db.execute('UPDATE media SET favorite = 1 WHERE id = 1')
+        db.commit()
+        _insert_detection(db, det_id=1, media_id=1)
+        _insert_detection(db, det_id=2, media_id=2, crop_path='derived/2026/01/01/det0002.jpg')
+
+        response = client.get('/api/detections?deployment_id=1&only_favorites=true')
+
+        body = response.json()
+        assert body['total'] == 1
+        assert body['detections'][0]['id'] == 1
 
 
 class TestPatchDetectionFilterBehavior:

@@ -12,6 +12,26 @@ router = APIRouter()
 PAGE_SIZE = 24
 
 
+@router.get('/api/deployments')
+def list_deployments() -> list[dict]:
+    """Return all deployments that have at least one media item.
+
+    Returns:
+        list of dicts with id and deployment_name, sorted by id
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        '''
+        SELECT DISTINCT dep.id, dep.deployment_name
+        FROM deployments dep
+        JOIN media m ON m.deployment_id = dep.id
+        ORDER BY dep.id
+        '''
+    ).fetchall()
+    conn.close()
+    return [{'id': row['id'], 'deployment_name': row['deployment_name']} for row in rows]
+
+
 @router.get('/api/species')
 def list_species() -> list[str]:
     """Return a sorted list of distinct species names present in active detections.
@@ -67,6 +87,7 @@ def list_detections(
     page_size: int = PAGE_SIZE,
     species: str | None = None,
     individual_id: int | None = None,
+    deployment_id: int | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
     only_favorites: bool = False,
@@ -77,6 +98,8 @@ def list_detections(
         page: 1-based page number
         page_size: number of detections per page (default 24)
         species: leaf species name to filter by (e.g. 'vulpes vulpes'); omit for all
+        individual_id: filter to detections assigned to this individual
+        deployment_id: filter to detections from media in this deployment
         date_from: ISO date string (YYYY-MM-DD) — include detections on or after this date
         date_to: ISO date string (YYYY-MM-DD) — include detections on or before this date
         only_favorites: if True, restrict to detections whose media is marked favorite
@@ -106,6 +129,10 @@ def list_detections(
     if individual_id is not None:
         conditions.append('d.individual_id = :individual_id')
         params['individual_id'] = individual_id
+
+    if deployment_id is not None:
+        conditions.append('i.deployment_id = :deployment_id')
+        params['deployment_id'] = deployment_id
 
     if date_from:
         conditions.append('i.captured_at >= :date_from')
