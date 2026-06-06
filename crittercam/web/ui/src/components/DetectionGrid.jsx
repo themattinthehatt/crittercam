@@ -33,15 +33,17 @@ export default function DetectionGrid() {
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
   const [showBatchEdit, setShowBatchEdit] = useState(false)
 
-  // browse mode: 'species' | 'individual'
-  const [browseMode, setBrowseMode] = useState('species')
-
-  // filter state — empty string means "no filter applied"
-  const [species, setSpecies] = useState('')
-  const [individual, setIndividual] = useState('')
-  const [deployment, setDeployment] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  // filter state — browseMode and all dropdowns/dates in one object.
+  // empty string means "no filter applied". FilterSidebar passes back the
+  // full object on every change, so setFilters replaces it wholesale.
+  const [filters, setFilters] = useState({
+    browseMode: 'species',
+    selectedSpecies: '',
+    selectedIndividual: '',
+    selectedDeployment: '',
+    dateFrom: '',
+    dateTo: '',
+  })
 
   // dropdown lists — fetched once on mount
   const [speciesList, setSpeciesList] = useState([])
@@ -83,18 +85,19 @@ export default function DetectionGrid() {
     setShowBatchDeleteConfirm(false)
     setShowBatchEdit(false)
 
+    const { browseMode, selectedSpecies, selectedIndividual, selectedDeployment, dateFrom, dateTo } = filters
     const params = new URLSearchParams({ page })
-    if (browseMode === 'species' && species) params.append('species', species)
-    if (browseMode === 'individual' && individual) params.append('individual_id', individual)
+    if (browseMode === 'species' && selectedSpecies) params.append('species', selectedSpecies)
+    if (browseMode === 'individual' && selectedIndividual) params.append('individual_id', selectedIndividual)
     if (browseMode === 'favorited') params.append('only_favorites', 'true')
-    if (deployment) params.append('deployment_id', deployment)
+    if (selectedDeployment) params.append('deployment_id', selectedDeployment)
     if (dateFrom) params.append('date_from', dateFrom)
     if (dateTo) params.append('date_to', dateTo)
 
     fetch(`/api/detections?${params}`)
       .then(r => r.json())
       .then(data => setResult(data))
-  }, [page, browseMode, species, individual, deployment, dateFrom, dateTo, refreshKey])
+  }, [page, filters, refreshKey])
 
   // after a cross-page navigation, auto-select the first or last detection
   // once the new page's result arrives.
@@ -131,11 +134,6 @@ export default function DetectionGrid() {
     }
   }
 
-  // changing any filter resets to page 1 — if you're on page 3 of unfiltered
-  // results, page 3 may not exist in the filtered set.
-  // wrapping each setter ensures the page reset and filter change happen together.
-  // FilterSidebar fires onChange with the full state object — unpack it here
-  // and reset to page 1 on any filter change.
   const handleDelete = () => {
     deleteMedia(selectedDetection.media_id).then(response => {
       if (response.ok) {
@@ -220,28 +218,18 @@ export default function DetectionGrid() {
       result.detections.find(d => d.id === id)?.favorite === 1
     )
 
-  const handleFilterChange = ({ browseMode: bm, selectedSpecies: sp, selectedIndividual: ind, selectedDeployment: dep, dateFrom: df, dateTo: dt }) => {
-    setBrowseMode(bm)
-    setSpecies(sp)
-    setIndividual(ind)
-    setDeployment(dep)
-    setDateFrom(df)
-    setDateTo(dt)
+  const handleFilterChange = f => {
+    setFilters(f)
     setPage(1)
   }
 
   return (
     <div className="flex gap-6 items-start relative">
       <FilterSidebar
-        browseMode={browseMode}
+        {...filters}
         species={speciesList}
-        selectedSpecies={species}
         individuals={individualList}
-        selectedIndividual={individual}
         deployments={deploymentList}
-        selectedDeployment={deployment}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
         onChange={handleFilterChange}
       />
 

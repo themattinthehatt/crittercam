@@ -587,8 +587,8 @@ crittercam/web/
                 RecentBySpecies.jsx    # most recent crop per species (Home tab)
                 DetectionsOverTime.jsx # weekly line chart (Analytics tab)
                 DetectionGrid.jsx      # paginated thumbnail grid with filters
-                FilterBar.jsx          # species dropdown + date range inputs
-                DetailPanel.jsx        # crop + full image with SVG bbox overlay
+                FilterSidebar.jsx      # mode selector, species/individual/deployment dropdowns, date range
+                DetectionModal.jsx     # crop + full image with SVG bbox overlay
             App.jsx
             App.css
             index.css
@@ -871,6 +871,10 @@ the live database; `0001_initial_schema.sql` updated to reflect the canonical sc
   site management becomes necessary
 - `media_type` on `media` defaults to `'image'`; video support can be added without a
   schema migration
+- The Browse tab supports filtering by deployment via a `GET /api/deployments` endpoint
+  (returns deployments that have at least one media item) and a `deployment_id` query
+  parameter on `GET /api/detections`; deployment filter is orthogonal to browse mode
+  and is preserved when the user switches between species/individual/favorited views
 
 ## 028 — Tailwind CSS v4 + DaisyUI v5 for all UI styling
 

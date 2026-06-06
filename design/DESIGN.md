@@ -166,9 +166,9 @@ resilient to the drive remounting at a different absolute path (see DECISIONS.md
 │       │   │   │   ├── StatsBar.jsx           # summary statistics
 │       │   │   │   ├── RecentBySpecies.jsx    # most recent crop per species (Home tab)
 │       │   │   │   ├── DetectionsOverTime.jsx # weekly line chart (Analytics tab)
-│       │   │   │   ├── DetectionGrid.jsx      # paginated grid; browse by species or individual
-│       │   │   │   ├── FilterBar.jsx          # mode selector, species/individual dropdown, date range
-│       │   │   │   └── DetailPanel.jsx        # crop + full image with SVG bbox overlay
+│       │   │   │   ├── DetectionGrid.jsx      # paginated grid; browse by species, individual, or favorites
+│       │   │   │   ├── FilterSidebar.jsx      # mode selector, species/individual/deployment dropdowns, date range
+│       │   │   │   └── DetectionModal.jsx     # crop + full image with SVG bbox overlay
 │       │   │   ├── App.jsx
 │       │   │   ├── App.css
 │       │   │   └── index.css
