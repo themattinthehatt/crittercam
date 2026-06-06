@@ -70,6 +70,16 @@ export const DeploymentSelected = {
   args: { ...BASE, browseMode: 'species', selectedDeployment: '1' },
 }
 
+export const AnalyticsMode = {
+  args: {
+    showBrowseControls: false,
+    deployments: DEPLOYMENTS,
+    selectedDeployment: '',
+    dateFrom: '',
+    dateTo: '',
+  },
+}
+
 export const WithDateRange = {
   args: { ...BASE, browseMode: 'species', dateFrom: '2026-03-01', dateTo: '2026-03-31' },
 }

@@ -13,14 +13,20 @@ const COLORS = [
   '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
 ]
 
-export default function ActivityByHour() {
+export default function ActivityByHour({ deploymentId = '', dateFrom = '', dateTo = '' }) {
   const [result, setResult] = useState(null)
 
   useEffect(() => {
-    fetch('/api/stats/activity_by_hour')
+    setResult(null)
+    const params = new URLSearchParams()
+    if (deploymentId) params.append('deployment_id', deploymentId)
+    if (dateFrom) params.append('date_from', dateFrom)
+    if (dateTo) params.append('date_to', dateTo)
+    const qs = params.size > 0 ? `?${params}` : ''
+    fetch(`/api/stats/activity_by_hour${qs}`)
       .then(r => r.json())
       .then(data => setResult(data))
-  }, [])
+  }, [deploymentId, dateFrom, dateTo])
 
   if (result === null) return <div>Loading…</div>
 

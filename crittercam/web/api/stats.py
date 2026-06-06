@@ -38,12 +38,21 @@ def summary() -> dict:
 
 
 @router.get('/api/stats/detections_over_time')
-def detections_over_time() -> dict:
-    """Return weekly detection counts per species for the past year.
+def detections_over_time(
+    deployment_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict:
+    """Return weekly detection counts per species for a time window.
 
-    Only species with more than 10 total detections in the period are included.
+    Only species with at least 50 total detections in the period are included.
     Weeks with no detections for a given species are filled with zero so that
     every species has a value for every week in the range.
+
+    Args:
+        deployment_id: restrict to detections from media in this deployment
+        date_from: ISO date string (YYYY-MM-DD) — start of window; defaults to one year ago
+        date_to: ISO date string (YYYY-MM-DD) — end of window (inclusive); defaults to now
 
     Returns:
         dict with:
@@ -53,22 +62,43 @@ def detections_over_time() -> dict:
     """
     conn = get_conn()
 
+    conditions = [
+        'd.is_active = 1',
+        'd.crop_path IS NOT NULL',
+        "LOWER(d.label) NOT LIKE '%blank%'",
+        "LOWER(d.label) NOT LIKE '%human%'",
+        'i.captured_at IS NOT NULL',
+    ]
+    params: dict = {}
+
+    if deployment_id is not None:
+        conditions.append('i.deployment_id = :deployment_id')
+        params['deployment_id'] = deployment_id
+
+    if date_from:
+        conditions.append('i.captured_at >= :date_from')
+        params['date_from'] = date_from
+    else:
+        conditions.append("i.captured_at >= date('now', '-1 year')")
+
+    if date_to:
+        conditions.append("i.captured_at < date(:date_to, '+1 day')")
+        params['date_to'] = date_to
+
+    where = ' AND '.join(conditions)
+
     # aggregate detection counts by raw label and ISO week.
     # strftime('%Y-%W', ...) produces strings like '2025-03' that sort correctly.
     rows = conn.execute(
-        '''
+        f'''
         SELECT d.label, strftime('%Y-%W', i.captured_at) AS week, COUNT(*) AS count
         FROM detections d
         JOIN media i ON i.id = d.media_id
-        WHERE d.is_active = 1
-          AND d.crop_path IS NOT NULL
-          AND LOWER(d.label) NOT LIKE '%blank%'
-          AND LOWER(d.label) NOT LIKE '%human%'
-          AND i.captured_at IS NOT NULL
-          AND i.captured_at >= date('now', '-1 year')
+        WHERE {where}
         GROUP BY d.label, week
         ORDER BY week ASC
-        '''
+        ''',
+        params,
     ).fetchall()
 
     conn.close()
@@ -107,13 +137,22 @@ def detections_over_time() -> dict:
 
 
 @router.get('/api/stats/activity_by_hour')
-def activity_by_hour() -> dict:
-    """Return hourly detection probability per species for the past year.
+def activity_by_hour(
+    deployment_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict:
+    """Return hourly detection probability per species for a time window.
 
-    Only species with more than 10 total detections in the period are included
+    Only species with at least 50 total detections in the period are included
     (same filter as detections_over_time). Each species' values across the 24
     one-hour bins sum to 1.0, so the chart shows when during the day each
     species is active relative to its own total.
+
+    Args:
+        deployment_id: restrict to detections from media in this deployment
+        date_from: ISO date string (YYYY-MM-DD) — start of window; defaults to one year ago
+        date_to: ISO date string (YYYY-MM-DD) — end of window (inclusive); defaults to now
 
     Returns:
         dict with:
@@ -122,20 +161,41 @@ def activity_by_hour() -> dict:
     """
     conn = get_conn()
 
+    conditions = [
+        'd.is_active = 1',
+        'd.crop_path IS NOT NULL',
+        "LOWER(d.label) NOT LIKE '%blank%'",
+        "LOWER(d.label) NOT LIKE '%human%'",
+        'i.captured_at IS NOT NULL',
+    ]
+    params: dict = {}
+
+    if deployment_id is not None:
+        conditions.append('i.deployment_id = :deployment_id')
+        params['deployment_id'] = deployment_id
+
+    if date_from:
+        conditions.append('i.captured_at >= :date_from')
+        params['date_from'] = date_from
+    else:
+        conditions.append("i.captured_at >= date('now', '-1 year')")
+
+    if date_to:
+        conditions.append("i.captured_at < date(:date_to, '+1 day')")
+        params['date_to'] = date_to
+
+    where = ' AND '.join(conditions)
+
     rows = conn.execute(
-        '''
+        f'''
         SELECT d.label, CAST(strftime('%H', i.captured_at) AS INTEGER) AS hour, COUNT(*) AS count
         FROM detections d
         JOIN media i ON i.id = d.media_id
-        WHERE d.is_active = 1
-          AND d.crop_path IS NOT NULL
-          AND LOWER(d.label) NOT LIKE '%blank%'
-          AND LOWER(d.label) NOT LIKE '%human%'
-          AND i.captured_at IS NOT NULL
-          AND i.captured_at >= date('now', '-1 year')
+        WHERE {where}
         GROUP BY d.label, hour
         ORDER BY hour ASC
-        '''
+        ''',
+        params,
     ).fetchall()
 
     conn.close()

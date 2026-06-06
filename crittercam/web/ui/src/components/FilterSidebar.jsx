@@ -11,11 +11,12 @@ import Button from './Button.jsx'
 // The sidebar is absolutely positioned to the left of its containing
 // browse-layout div, outside the centered content area.
 export default function FilterSidebar({
-  browseMode,
-  species,
-  selectedSpecies,
-  individuals,
-  selectedIndividual,
+  showBrowseControls = true,
+  browseMode = 'species',
+  species = [],
+  selectedSpecies = '',
+  individuals = [],
+  selectedIndividual = '',
   deployments,
   selectedDeployment,
   dateFrom,
@@ -23,7 +24,7 @@ export default function FilterSidebar({
   onChange,
 }) {
   const activeFilter = browseMode === 'species' ? selectedSpecies : selectedIndividual
-  const hasFilters = activeFilter || selectedDeployment || dateFrom || dateTo
+  const hasFilters = (showBrowseControls && activeFilter) || selectedDeployment || dateFrom || dateTo
 
   const handleChange = (field, value) => {
     onChange({ browseMode, selectedSpecies, selectedIndividual, selectedDeployment, dateFrom, dateTo, [field]: value })
@@ -41,20 +42,22 @@ export default function FilterSidebar({
 
   return (
     <div className="absolute top-0 right-[calc(100%+1.5rem)] w-40 flex flex-col gap-4">
-      <label className="flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-base-content/50">browse by</span>
-        <select
-          className="select select-sm select-bordered w-full"
-          value={browseMode}
-          onChange={e => handleModeChange(e.target.value)}
-        >
-          <option value="species">species</option>
-          <option value="individual">individual</option>
-          <option value="favorited">favorited</option>
-        </select>
-      </label>
+      {showBrowseControls && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-base-content/50">browse by</span>
+          <select
+            className="select select-sm select-bordered w-full"
+            value={browseMode}
+            onChange={e => handleModeChange(e.target.value)}
+          >
+            <option value="species">species</option>
+            <option value="individual">individual</option>
+            <option value="favorited">favorited</option>
+          </select>
+        </label>
+      )}
 
-      {browseMode !== 'favorited' && (browseMode === 'species' ? (
+      {showBrowseControls && browseMode !== 'favorited' && (browseMode === 'species' ? (
         <label className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-wide text-base-content/50">species</span>
           <select
