@@ -6,7 +6,7 @@ import DetectionCard from './DetectionCard.jsx'
 import BatchActionBar from './BatchActionBar.jsx'
 import BatchEditPanel from './BatchEditPanel.jsx'
 import Button from './Button.jsx'
-import { MoveLeftIcon, MoveRightIcon } from './icons.jsx'
+import { ArrowLeftIcon, ArrowLeftToLineIcon, ArrowRightIcon, ArrowRightToLineIcon } from './icons.jsx'
 
 export default function DetectionGrid() {
   const [page, setPage] = useState(1)
@@ -286,7 +286,13 @@ export default function DetectionGrid() {
 
             <div className="flex items-center justify-center gap-4 mt-5">
               <Button
-                label={<MoveLeftIcon className="size-4" />}
+                label={<ArrowLeftToLineIcon className="size-4" />}
+                variant="ghost"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              />
+              <Button
+                label={<ArrowLeftIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p - 1)}
                 disabled={page === 1}
@@ -295,9 +301,15 @@ export default function DetectionGrid() {
                 page {page} of {Math.ceil(result.total / result.page_size)}
               </span>
               <Button
-                label={<MoveRightIcon className="size-4" />}
+                label={<ArrowRightIcon className="size-4" />}
                 variant="ghost"
                 onClick={() => setPage(p => p + 1)}
+                disabled={page === Math.ceil(result.total / result.page_size)}
+              />
+              <Button
+                label={<ArrowRightToLineIcon className="size-4" />}
+                variant="ghost"
+                onClick={() => setPage(Math.ceil(result.total / result.page_size))}
                 disabled={page === Math.ceil(result.total / result.page_size)}
               />
             </div>
