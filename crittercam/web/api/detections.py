@@ -268,7 +268,7 @@ def get_detection(detection_id: int) -> dict:
                d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
                d.individual_id, ind.nickname,
                d.label_assigned_by,
-               i.id AS media_id, i.path AS image_path,
+               i.id AS media_id, i.thumb_path,
                i.captured_at, i.temperature_c, i.favorite
         FROM detections d
         JOIN media i ON i.id = d.media_id
@@ -326,7 +326,7 @@ def get_detection(detection_id: int) -> dict:
         'confidence': round(row['confidence'], 3) if row['confidence'] is not None else None,
         'label_assigned_by': row['label_assigned_by'],
         'crop_url': f'/media/{row["crop_path"]}',
-        'image_url': f'/media/{row["image_path"]}',
+        'thumb_url': f'/media/{row["thumb_path"]}' if row['thumb_path'] else None,
         'bbox': bbox,
         'captured_at': row['captured_at'],
         'temperature_c': row['temperature_c'],

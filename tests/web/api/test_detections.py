@@ -893,14 +893,14 @@ class TestGetDetection:
         assert abs(bbox['w'] - 0.3) < 1e-9
         assert abs(bbox['h'] - 0.4) < 1e-9
 
-    def test_media_id_and_image_url_in_response(self, client, db):
+    def test_media_id_and_thumb_url_in_response(self, client, db):
         _insert_media(db)
         _insert_detection(db, det_id=1)
 
         body = client.get('/api/detections/1').json()
 
         assert body['media_id'] == 1
-        assert 'image_url' in body
+        assert 'thumb_url' in body
 
     def test_null_confidence_does_not_crash(self, client, db):
         """Human-annotated detections with null confidence must not raise TypeError."""

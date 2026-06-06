@@ -158,7 +158,7 @@ export default function DetectionModal({
               height exactly and not the padded container height. */}
           <div className="px-4 pb-4">
             <div className="relative">
-              <img className="w-full block rounded" src={detection.image_url} alt="full frame" />
+              <img className="w-full block rounded" src={detection.thumb_url} alt="full frame" />
               {detection.bbox && (
                 <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="absolute top-0 left-0 w-full h-full">
                   <rect
